@@ -2,6 +2,7 @@ import dataclasses
 import logging
 from dataclasses import dataclass
 
+from .errors import DuplicateTaskError, TaskError, UndefinedTaskNameError
 from .types import Task, TaskFn
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,18 @@ class TaskRegistry:
         name = orig.replace("_", "-")
 
         if name in self.inner:
-            raise KeyError(f"duplicate task registered: {name!r}")
+            raise DuplicateTaskError(f"duplicate task registered: {name!r}")
 
         self.inner[name] = Task(name=name, func=func)
         logger.debug(f"registered task: {name}")
+
+    def call(self, name: str) -> None:
+        task = self.inner.get(name)
+
+        if task is None:
+            raise UndefinedTaskNameError
+
+        try:
+            task.call()
+        except Exception as source:
+            raise TaskError from source
