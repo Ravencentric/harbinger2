@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-harbinger = "harbinger.__main__:main"
+harbinger = "harbinger.cli:main"
 
 [dependency-groups]
 dev = [

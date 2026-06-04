@@ -13,15 +13,24 @@ class TaskRegistry:
     inner: dict[str, Task[..., object]] = dataclasses.field(default_factory=dict)
 
     def register(
-        self, func: TaskFn[..., object], /, *, name: str | None = None
+        self,
+        func: TaskFn[..., object],
+        /,
+        *,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         orig = name or func.__name__
         name = orig.replace("_", "-")
 
+        description = description or func.__doc__
+        if description:
+            description = description.strip()
+
         if name in self.inner:
             raise DuplicateTaskError(f"duplicate task registered: {name!r}")
 
-        self.inner[name] = Task(name=name, func=func)
+        self.inner[name] = Task.new(func, name=name, description=description)
         logger.debug(f"registered task: {name}")
 
     def call(self, name: str) -> None:

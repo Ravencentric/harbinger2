@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
+from typing import Generic, ParamSpec, Protocol, Self, TypeAlias, TypeVar, final
 
 P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
@@ -16,10 +16,17 @@ TaskDecorator: TypeAlias = Callable[[TaskFn[P, R]], TaskFn[P, R]]
 
 
 @final
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True)
 class Task(Generic[P, R]):
-    name: str
     func: TaskFn[P, R]
+    name: str
+    description: str | None = None
+
+    @classmethod
+    def new(
+        cls, func: TaskFn[P, R], /, *, name: str, description: str | None = None
+    ) -> Self:
+        return cls(func, name, description)
 
     def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
         return self.func(*args, **kwargs)
