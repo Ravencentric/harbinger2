@@ -1,17 +1,48 @@
 import argparse
 import importlib.util
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
-from rich.console import Console
+from rich.console import Console, ConsoleOptions, RenderResult
 from rich.markup import escape
 
 from .core import REGISTRY, TASKFILE
 from .errors import TaskError, UndefinedTaskNameError
+from .types import Task
 
 console = Console()
 error_console = Console(stderr=True)
+
+
+def errmsg(message: str) -> str:
+    return f"[red]error:[/] {escape(message)}"
+
+
+@dataclass(frozen=True, slots=True)
+class RichTaskList:
+    tasks: dict[str, Task[..., object]]
+    taskfile: str
+
+    def __rich_console__(
+        self, _console: Console, _options: ConsoleOptions
+    ) -> RenderResult:
+        if not self.tasks:
+            yield errmsg(f"no tasks found in {escape(self.taskfile)}")
+            return
+
+        width = max(len(name) for name in self.tasks)
+
+        yield f"[bold cyan]Tasks[/] [dim]{escape(self.taskfile)}[/]"
+        yield ""
+
+        for name, task in self.tasks.items():
+            description = task.description or "No description."
+            yield f"  [bold]{escape(name.ljust(width))}[/]  [dim]{escape(description)}[/]"
+
+        yield ""
+        yield "[dim]Run one task with[/] [bold]harbinger <task>[/]"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,9 +51,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run tasks from megatron.py.",
     )
     parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list available tasks without running them",
+    )
+    parser.add_argument(
         "task",
         nargs="?",
-        help="task to run; omit to list available tasks",
+        help="task to run; omit to run every task in order",
     )
     return parser
 
@@ -39,19 +75,11 @@ def import_from_path(path: Path) -> ModuleType:
 
 
 def render_tasks() -> None:
-    console.print("[bold cyan]Tasks[/]")
-
-    if not REGISTRY.inner:
-        console.print("[dim]  No tasks found.[/]")
-        return
-
-    for name, task in sorted(REGISTRY.inner.items()):
-        console.print(f"  [bold]{escape(name)}[/] [dim]({escape(task.func.__name__)})[/]")
+    console.print(RichTaskList(REGISTRY.inner, TASKFILE))
 
 
 def render_error(title: str, message: str) -> None:
-    error_console.print(f"[bold red]{title}[/]")
-    error_console.print(message)
+    error_console.print(RichError(title, message))
 
 
 def render_unknown_task(name: str) -> None:
@@ -77,6 +105,23 @@ def run_task(name: str) -> int:
     return 0
 
 
+def run_all_tasks() -> int:
+    if not REGISTRY.inner:
+        return 0
+
+    for index, name in enumerate(REGISTRY.inner):
+        if index > 0:
+            console.print()
+
+        console.print(f"[bold cyan]{escape(name)}[/]")
+        status = run_task(name)
+
+        if status != 0:
+            return status
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -95,9 +140,12 @@ def main(argv: list[str] | None = None) -> int:
         render_error("Could not load task file", escape(str(error)))
         return 1
 
-    if args.task is None:
+    if args.list:
         render_tasks()
         return 0
+
+    if args.task is None:
+        return run_all_tasks()
 
     return run_task(args.task)
 

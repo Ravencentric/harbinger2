@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .errors import DuplicateTaskError, TaskError, UndefinedTaskNameError
@@ -11,6 +12,9 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class TaskRegistry:
     inner: dict[str, Task[..., object]] = dataclasses.field(default_factory=dict)
+
+    def tasks(self) -> Iterable[Task[..., object]]:
+        yield from self.inner.values()
 
     def register(
         self,

@@ -1,13 +1,20 @@
-import os
+# import os
 
-from harbinger import task
-
-
-@task
-def hello() -> None:
-    print("Hello!")
+# from harbinger import task
 
 
-@task
-def listdir() -> None:
-    print(*os.listdir())
+# @task
+# def hello() -> None:
+#     """Print a small greeting."""
+#     print("Hello!")
+
+
+# @task
+# def listdir() -> None:
+#     """List files in the current directory."""
+#     print(*os.listdir())
+
+
+# @task
+# def foo() -> None:
+#     print("foo")
