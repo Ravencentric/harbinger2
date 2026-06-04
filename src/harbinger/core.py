@@ -15,7 +15,9 @@ def task(fn: TaskFn[P, R], /) -> TaskFn[P, R]: ...
 
 
 @overload
-def task(*, name: str | None = None) -> TaskDecorator[P, R]: ...
+def task(
+    *, name: str | None = None, description: str | None = None
+) -> TaskDecorator[P, R]: ...
 
 
 def task(
@@ -23,10 +25,11 @@ def task(
     /,
     *,
     name: str | None = None,
+    description: str | None = None,
 ) -> TaskFn[P, R] | TaskDecorator[P, R]:
 
     def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
-        REGISTRY.register(fn, name=name)
+        REGISTRY.register(fn, name=name, description=description)
 
         @wraps(fn)
         def inner(*args: P.args, **kwargs: P.kwargs) -> R:
