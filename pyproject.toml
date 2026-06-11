@@ -16,6 +16,7 @@ harbinger = "harbinger.cli:main"
 dev = [
   "pyrefly>=1.0.0",
   "pytest>=9.0.3",
+  "ruff>=0.15.16",
 ]
 
 [build-system]
@@ -25,3 +26,7 @@ build-backend = "uv_build"
 [tool.pyrefly]
 preset = "strict"
 project-includes = ["*.py", "src/**/*.py"]
+
+[tool.pyrefly.errors]
+# 3.10 doesn't have the @override decorator
+missing-override-decorator = false

@@ -10,6 +10,7 @@ class Style(IntEnum):
     """
     Based on <https://en.wikipedia.org/wiki/ANSI_escape_code#Colors>
     """
+
     RESET = 0
     GREEN = 32
     CYAN = 36
@@ -26,8 +27,8 @@ class Style(IntEnum):
 
     def to_ansi(self) -> str:
         return f"\033[{self.value}m"
-    
-    def __str__(self):
+
+    def __str__(self) -> str:
         return self.to_ansi()
 
 
@@ -55,7 +56,7 @@ def can_colorize() -> bool:
 
 def render(s: str) -> str:
     color = can_colorize()
-    
+
     for style in Style:
         if color:
             s = s.replace(style.marker, style.to_ansi())
@@ -73,3 +74,5 @@ def stderr(s: str) -> None:
     print(render(s), file=sys.stderr)
 
 
+def error(s: str) -> None:
+    stderr(f"[red]error:[/] {s}")
