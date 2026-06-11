@@ -2,6 +2,8 @@ from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from typing import Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
 
+from .errors import TaskError
+
 P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
 
@@ -24,4 +26,9 @@ class Task(Generic[P, R]):
     description: str | None = None
 
     def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        return self.func(*args, **kwargs)
+        try:
+            result = self.func(*args, **kwargs)
+        except Exception as source:
+            raise TaskError(self.name) from source
+        else:
+            return result

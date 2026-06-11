@@ -3,7 +3,7 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from .errors import DuplicateTaskError, TaskError, UndefinedTaskNameError
+from .errors import DuplicateTaskError, UndefinedTaskNameError
 from .typs import Task, TaskFn
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,9 @@ class TaskRegistry:
 
     def tasks(self) -> Iterable[Task[..., object]]:
         yield from self.inner.values()
+
+    def names(self) -> Iterable[str]:
+        yield from self.inner.keys()
 
     def register(
         self,
@@ -41,9 +44,6 @@ class TaskRegistry:
         task = self.inner.get(name)
 
         if task is None:
-            raise UndefinedTaskNameError
+            raise UndefinedTaskNameError(name)
 
-        try:
-            task.call()
-        except Exception as source:
-            raise TaskError from source
+        task.call()
