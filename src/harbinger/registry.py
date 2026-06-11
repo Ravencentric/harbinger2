@@ -34,7 +34,7 @@ class TaskRegistry:
         if name in self.inner:
             raise DuplicateTaskError(f"duplicate task registered: {name!r}")
 
-        self.inner[name] = Task.new(func, name=name, description=description)
+        self.inner[name] = Task(func, name=name, description=description)
         logger.debug(f"registered task: {name}")
 
     def call(self, name: str) -> None:
