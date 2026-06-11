@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Final, overload
 from .registry import TaskRegistry
 
 if TYPE_CHECKING:
-    from .types import P, R, TaskDecorator, TaskFn
+    from .typs import P, R, TaskDecorator, TaskFn
 
 TASKFILE: Final = "megatron.py"
 REGISTRY: Final[TaskRegistry] = TaskRegistry()

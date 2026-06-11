@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from .errors import DuplicateTaskError, TaskError, UndefinedTaskNameError
-from .types import Task, TaskFn
+from .typs import Task, TaskFn
 
 logger = logging.getLogger(__name__)
 
