@@ -66,13 +66,13 @@ def render(s: str) -> str:
     return s
 
 
-def stdout(s: str) -> None:
+def stdout(s: str, /) -> None:
     print(render(s), file=sys.stdout)
 
 
-def stderr(s: str) -> None:
+def stderr(s: str, /) -> None:
     print(render(s), file=sys.stderr)
 
 
-def error(s: str) -> None:
+def error(s: str, /) -> None:
     stderr(f"[red]error:[/] {s}")

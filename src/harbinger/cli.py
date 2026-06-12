@@ -1,6 +1,8 @@
 import argparse
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Self
 
 from . import console
 from .core import REGISTRY, TASKFILE
@@ -13,31 +15,33 @@ from .errors import (
 from .runner import TaskRunner
 
 
-class CLIArguments(argparse.Namespace):
+@dataclass
+class CommandLine:
     tasks: Sequence[str]
     list: bool
 
-
-class CLIParser(argparse.ArgumentParser):
-    def __init__(self) -> None:
-        super().__init__(
+    @classmethod
+    def parse(cls) -> Self:
+        parser = argparse.ArgumentParser(
             prog="harbinger",
-            description=f"Run tasks from {TASKFILE}.",
+            description=f"Run tasks from {TASKFILE}",
         )
-        self.add_argument(
+        group = parser.add_mutually_exclusive_group(required=False)
+        group.add_argument(
+            "-l",
             "--list",
             action="store_true",
             help="list available tasks without running them",
         )
-        self.add_argument(
+        group.add_argument(
             "tasks",
-            metavar="task",
+            metavar="<task>",
             nargs="*",
             help="tasks to run; runs all tasks when omitted",
         )
-
-    def parse(self, argv: list[str] | None = None) -> CLIArguments:
-        return self.parse_args(argv, namespace=CLIArguments())
+        args = parser.parse_args()
+        print(args)
+        return cls(tasks=args.tasks, list=args.list)
 
 
 def list_tasks() -> None:
@@ -54,8 +58,8 @@ def list_tasks() -> None:
         console.stdout(f"[cyan]{task.name.ljust(width)}[/]  [dim]{description}[/]")
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = CLIParser().parse(argv)
+def main() -> int:
+    args = CommandLine.parse()
     runner = TaskRunner(Path.cwd() / TASKFILE)
 
     try:
