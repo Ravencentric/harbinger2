@@ -40,10 +40,11 @@ class TaskRegistry:
         self.inner[name] = Task(func, name=name, description=description)
         logger.debug(f"registered task: {name}")
 
-    def call(self, name: str) -> None:
-        task = self.inner.get(name)
-
-        if task is None:
+    def get(self, name: str) -> Task[..., object]:
+        func = self.inner.get(name)
+        if func is None:
             raise UndefinedTaskNameError(name)
+        return func
 
-        task.call()
+    def call(self, name: str, *args: object, **kwargs: object) -> None:
+        self.get(name).call(*args, **kwargs)
