@@ -19,9 +19,6 @@ class TaskRunner:
 
     def __init__(self, taskfile: Path) -> None:
         object.__setattr__(self, "taskfile", taskfile)
-        self.load()
-
-    def load(self) -> None:
         if not self.taskfile.is_file():
             raise TaskFileNotFoundError(self.taskfile)
 

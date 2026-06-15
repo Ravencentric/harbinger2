@@ -63,11 +63,10 @@ def main() -> int:
     runner = TaskRunner(Path.cwd() / TASKFILE)
 
     try:
-        runner.load()
         if args.list:
             list_tasks()
         else:
-            runner.execute(args.tasks)
+            runner.run(args.tasks)
     except TaskFileNotFoundError:
         console.error(f"task file not found: {runner.taskfile}")
         return 1

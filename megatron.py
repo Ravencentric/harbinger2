@@ -4,9 +4,9 @@ from harbinger import task
 
 
 @task
-def hello(name: str, baz: bool, /, *, qux: int) -> None:
+def hello() -> None:
     """Print a small greeting."""
-    print(f"Hello {name =}! {baz =}")
+    print("Hello")
 
 
 @task
