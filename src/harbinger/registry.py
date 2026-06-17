@@ -1,4 +1,5 @@
 import dataclasses
+import inspect
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -37,7 +38,9 @@ class TaskRegistry:
         if name in self.inner:
             raise DuplicateTaskError(f"duplicate task registered: {name!r}")
 
-        self.inner[name] = Task(func, name=name, description=description)
+        self.inner[name] = Task(
+            func, name=name, sig=inspect.signature(func), description=description
+        )
         logger.debug(f"registered task: {name}")
 
     def get(self, name: str) -> Task[..., object]:

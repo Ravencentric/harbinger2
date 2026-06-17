@@ -1,0 +1,25 @@
+"""Exercise every CLI path."""
+
+import subprocess
+
+
+def run(label: str, *args: str) -> None:
+    print(f"\n── {label} ──")
+    subprocess.run(["uv", "run", "harbinger", *args])
+
+
+run("RunAll")
+run("ListTasks", "--list")
+run("Version", "--version")
+run("RunSelected", "hello")
+run("Invoke: greet", "greet", "--", "Alice")
+run("Invoke: greet x3", "greet", "--", "Bob", "--count", "3")
+run("Invoke: greet loud", "greet", "--", "Charlie", "--count", "2", "--loud")
+run("Invoke: greet --no-loud", "greet", "--", "Dana", "--no-loud")
+run("Invoke: add", "add", "--", "3.14", "2.72")
+run("Invoke: cat", "cat", "--", "pyproject.toml")
+run("Invoke: cat --numbered", "cat", "--", "pyproject.toml", "--numbered")
+run("Per-task help", "greet", "--", "--help")
+run("Error: unknown task", "nonexistent")
+run("Error: missing arg", "greet", "--")
+run("Error: bad type", "add", "--", "hello", "world")

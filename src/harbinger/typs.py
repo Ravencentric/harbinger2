@@ -1,3 +1,4 @@
+import inspect
 from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from typing import Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
@@ -23,7 +24,14 @@ class Task(Generic[P, R]):
     func: TaskFn[P, R]
     _: KW_ONLY
     name: str
+    sig: inspect.Signature
     description: str | None = None
+
+    @property
+    def requires_args(self) -> bool:
+        return any(
+            p.default is inspect.Parameter.empty for p in self.sig.parameters.values()
+        )
 
     def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
         try:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,25 +37,21 @@ class TaskRunner:
             raise InvalidTaskFileError(self.taskfile) from source
 
     def run(self, names: Iterable[str] = ()) -> None:
-        selected = tuple(names) or tuple(REGISTRY.names())
+        selected = tuple(names)
 
-        for name in selected:
-            REGISTRY.call(name)
+        if selected:
+            for name in selected:
+                REGISTRY.call(name)
+        else:
+            for task in REGISTRY.tasks():
+                if not task.requires_args:
+                    task.call()
 
     def invoke(
         self,
         name: str,
         /,
-        *args: object,
-        **kwargs: object,
+        args: tuple[object, ...],
+        kwargs: dict[str, object],
     ) -> None:
-        task = REGISTRY.get(name)
-        bound = inspect.signature(task.func).bind(
-            *args,
-            **kwargs,
-        )
-
-        task.call(
-            *bound.args,
-            **bound.kwargs,
-        )
+        REGISTRY.get(name).call(*args, **kwargs)
