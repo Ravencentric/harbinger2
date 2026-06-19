@@ -198,16 +198,15 @@ def list_tasks() -> None:
 
     n = len(tasks)
     console.stdout(
-        f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'} (* = default)[/]"
+        f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'}[/]"
     )
     console.stdout("")
 
     width = max(len(t.name) for t in tasks)
 
     for task in tasks:
-        marker = "[green]*[/]" if not task.requires_args else " "
         desc = f"  [dim]{task.description}[/]" if task.description else ""
-        console.stdout(f"  {marker} [cyan]{task.name.ljust(width)}[/]{desc}")
+        console.stdout(f"  [cyan]{task.name.ljust(width)}[/]{desc}")
 
 
 # ── Entrypoint ────────────────────────────────────────────────────
@@ -222,8 +221,7 @@ def main() -> int:
         match command:
             case RunAll():
                 for task in REGISTRY.tasks():
-                    if not task.requires_args:
-                        task.call()
+                    task.call()
             case ListTasks():
                 list_tasks()
             case RunSelected(names=names):

@@ -27,11 +27,6 @@ class Task(Generic[P, R]):
     sig: inspect.Signature
     description: str | None = None
 
-    @property
-    def requires_args(self) -> bool:
-        return any(
-            p.default is inspect.Parameter.empty for p in self.sig.parameters.values()
-        )
 
     def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
         try:

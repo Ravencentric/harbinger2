@@ -20,3 +20,7 @@ class TaskError(HarbingerError):
 
 class DuplicateTaskError(HarbingerError):
     pass
+
+
+class TaskDefinitionError(HarbingerError):
+    pass

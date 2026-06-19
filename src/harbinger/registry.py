@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import DuplicateTaskError, InvalidTaskFileError, TaskFileNotFoundError, UndefinedTaskNameError
+from .errors import DuplicateTaskError, InvalidTaskFileError, TaskDefinitionError, TaskFileNotFoundError, UndefinedTaskNameError
 from .typs import Task, TaskFn
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,16 @@ class TaskRegistry:
         if name in self.inner:
             raise DuplicateTaskError(f"duplicate task registered: {name!r}")
 
+        sig = inspect.signature(func)
+        for param in sig.parameters.values():
+            if param.default is inspect.Parameter.empty:
+                raise TaskDefinitionError(
+                    f"task {name!r} has parameter {param.name!r} without a default. "
+                    "All task parameters must have default values."
+                )
+
         self.inner[name] = Task(
-            func, name=name, sig=inspect.signature(func), description=description
+            func, name=name, sig=sig, description=description
         )
         logger.debug(f"registered task: {name}")
 
