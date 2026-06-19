@@ -88,14 +88,14 @@ class Subparser:
                         flag,
                         action=argparse.BooleanOptionalAction,
                         default=param.default,
-                        help=f"(default: {param.default})",
+                        help=f"default: {param.default}",
                     )
                 else:
                     parser.add_argument(
                         flag,
                         type=anno,
                         default=param.default,
-                        help=f"(default: {param.default!r})",
+                        help=f"default: {param.default!r}",
                     )
             else:
                 # ponytail: positional — no bool handling, bool positionals are weird anyway
@@ -104,7 +104,7 @@ class Subparser:
                     type=anno,
                     nargs="?",
                     default=param.default,
-                    help=f"(default: {param.default!r})",
+                    help=f"default: {param.default!r}",
                 )
 
         ns = parser.parse_args(list(argv))
