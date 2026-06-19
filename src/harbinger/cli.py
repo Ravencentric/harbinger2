@@ -45,8 +45,7 @@ class Invoke:
     """harbinger <task> -- <args>"""
 
     name: str
-    args: tuple[object, ...]
-    kwargs: dict[str, object]
+    argv: tuple[str, ...]
 
 
 Command: TypeAlias = RunAll | ListTasks | RunSelected | Invoke
@@ -179,10 +178,7 @@ def parse(argv: Sequence[str]) -> Command:
         tasks = args.tasks
         if len(tasks) != 1:
             parser.error("exactly one task must precede '--'")
-        name = tasks[0]
-        task = REGISTRY.get(name)
-        pos, kw = Subparser(task).parse(tail)
-        return Invoke(name=name, args=pos, kwargs=kw)
+        return Invoke(name=tasks[0], argv=tuple(tail))
 
     if args.tasks:
         return RunSelected(names=tuple(args.tasks))
@@ -219,8 +215,9 @@ def list_tasks() -> None:
 
 def main() -> int:
     try:
-        load(Path.cwd() / TASKFILE)
         command = parse(sys.argv[1:])
+
+        load(Path.cwd() / TASKFILE)
 
         match command:
             case RunAll():
@@ -232,8 +229,10 @@ def main() -> int:
             case RunSelected(names=names):
                 for name in names:
                     REGISTRY.call(name)
-            case Invoke(name=name, args=args, kwargs=kwargs):
-                REGISTRY.call(name, *args, **kwargs)
+            case Invoke(name=name, argv=argv):
+                task = REGISTRY.get(name)
+                pos, kw = Subparser(task).parse(argv)
+                task.call(*pos, **kw)
 
     except TaskFileNotFoundError:
         console.error(f"task file not found: {TASKFILE}")

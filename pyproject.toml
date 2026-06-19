@@ -30,3 +30,6 @@ project-includes = ["*.py", "src/**/*.py"]
 [tool.pyrefly.errors]
 # 3.10 doesn't have the @override decorator
 missing-override-decorator = false
+
+[tool.uv]
+exclude-newer = "1 week"
