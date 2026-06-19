@@ -1,13 +1,33 @@
 import dataclasses
+import importlib.util
 import inspect
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
-from .errors import DuplicateTaskError, UndefinedTaskNameError
+from .errors import DuplicateTaskError, InvalidTaskFileError, TaskFileNotFoundError, UndefinedTaskNameError
 from .typs import Task, TaskFn
 
 logger = logging.getLogger(__name__)
+
+
+def load(taskfile: Path) -> None:
+    """Import a taskfile, populating the global registry via @task decorators."""
+    if not taskfile.is_file():
+        raise TaskFileNotFoundError(taskfile)
+
+    spec = importlib.util.spec_from_file_location(taskfile.stem, taskfile)
+
+    if spec is None or spec.loader is None:
+        raise InvalidTaskFileError(taskfile)
+
+    module = importlib.util.module_from_spec(spec)
+
+    try:
+        spec.loader.exec_module(module)
+    except Exception as source:
+        raise InvalidTaskFileError(taskfile) from source
 
 
 @dataclass(frozen=True, slots=True)

@@ -17,7 +17,7 @@ from .errors import (
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .runner import TaskRunner
+from .registry import load
 from .typs import Task
 
 # ── Command sum type ──────────────────────────────────────────────
@@ -138,7 +138,7 @@ class Subparser:
 # ── Parser ────────────────────────────────────────────────────────
 
 
-def parse(argv: Sequence[str], runner: TaskRunner) -> Command:
+def parse(argv: Sequence[str]) -> Command:
     if "--" in argv:
         pivot = list(argv).index("--")
         head, tail = argv[:pivot], argv[pivot + 1 :]
@@ -219,18 +219,21 @@ def list_tasks() -> None:
 
 def main() -> int:
     try:
-        runner = TaskRunner(Path.cwd() / TASKFILE)
-        command = parse(sys.argv[1:], runner)
+        load(Path.cwd() / TASKFILE)
+        command = parse(sys.argv[1:])
 
         match command:
             case RunAll():
-                runner.run()
+                for task in REGISTRY.tasks():
+                    if not task.requires_args:
+                        task.call()
             case ListTasks():
                 list_tasks()
             case RunSelected(names=names):
-                runner.run(names)
+                for name in names:
+                    REGISTRY.call(name)
             case Invoke(name=name, args=args, kwargs=kwargs):
-                runner.invoke(name, args=args, kwargs=kwargs)
+                REGISTRY.call(name, *args, **kwargs)
 
     except TaskFileNotFoundError:
         console.error(f"task file not found: {TASKFILE}")
