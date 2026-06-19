@@ -79,34 +79,33 @@ class Subparser:
                 if param.annotation is not inspect.Parameter.empty
                 else str
             )
-            has_default = param.default is not inspect.Parameter.empty
-            is_keyword = (
-                param.kind
-                in (
-                    inspect.Parameter.KEYWORD_ONLY,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                )
-                and has_default
-            )
+            is_keyword = param.kind is inspect.Parameter.KEYWORD_ONLY
 
-            if is_keyword or param.kind is inspect.Parameter.KEYWORD_ONLY:
+            if is_keyword:
                 flag = f"--{name.replace('_', '-')}"
                 if anno is bool:
-                    if has_default:
-                        parser.add_argument(
-                            flag,
-                            action=argparse.BooleanOptionalAction,
-                            default=param.default,
-                        )
-                    else:
-                        parser.add_argument(flag, action=argparse.BooleanOptionalAction)
-                elif has_default:
-                    parser.add_argument(flag, type=anno, default=param.default)
+                    parser.add_argument(
+                        flag,
+                        action=argparse.BooleanOptionalAction,
+                        default=param.default,
+                        help=f"(default: {param.default})",
+                    )
                 else:
-                    parser.add_argument(flag, type=anno)
+                    parser.add_argument(
+                        flag,
+                        type=anno,
+                        default=param.default,
+                        help=f"(default: {param.default!r})",
+                    )
             else:
                 # ponytail: positional — no bool handling, bool positionals are weird anyway
-                parser.add_argument(name, type=anno)
+                parser.add_argument(
+                    name,
+                    type=anno,
+                    nargs="?",
+                    default=param.default,
+                    help=f"(default: {param.default!r})",
+                )
 
         ns = parser.parse_args(list(argv))
 
@@ -116,17 +115,7 @@ class Subparser:
 
         for name, param in sig.parameters.items():
             val = getattr(ns, name.replace("-", "_"))
-            has_default = param.default is not inspect.Parameter.empty
-            is_keyword = (
-                param.kind
-                in (
-                    inspect.Parameter.KEYWORD_ONLY,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                )
-                and has_default
-            ) or param.kind is inspect.Parameter.KEYWORD_ONLY
-
-            if is_keyword:
+            if param.kind is inspect.Parameter.KEYWORD_ONLY:
                 keyword[name] = val
             else:
                 positional.append(val)
@@ -197,9 +186,7 @@ def list_tasks() -> None:
         return
 
     n = len(tasks)
-    console.stdout(
-        f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'}[/]"
-    )
+    console.stdout(f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'}[/]")
     console.stdout("")
 
     width = max(len(t.name) for t in tasks)

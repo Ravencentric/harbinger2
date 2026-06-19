@@ -6,7 +6,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from .errors import DuplicateTaskError, InvalidTaskFileError, TaskDefinitionError, TaskFileNotFoundError, UndefinedTaskNameError
+from .errors import (
+    DuplicateTaskError,
+    InvalidTaskFileError,
+    TaskDefinitionError,
+    TaskFileNotFoundError,
+    UndefinedTaskNameError,
+)
 from .typs import Task, TaskFn
 
 logger = logging.getLogger(__name__)
@@ -60,15 +66,23 @@ class TaskRegistry:
 
         sig = inspect.signature(func)
         for param in sig.parameters.values():
+            if param.kind is inspect.Parameter.VAR_POSITIONAL:
+                raise TaskDefinitionError(
+                    f"task {name!r} cannot use *{param.name}. "
+                    "Harbinger requires explicit, strongly-typed parameters."
+                )
+            if param.kind is inspect.Parameter.VAR_KEYWORD:
+                raise TaskDefinitionError(
+                    f"task {name!r} cannot use **{param.name}. "
+                    "Harbinger requires explicit, strongly-typed parameters."
+                )
             if param.default is inspect.Parameter.empty:
                 raise TaskDefinitionError(
                     f"task {name!r} has parameter {param.name!r} without a default. "
                     "All task parameters must have default values."
                 )
 
-        self.inner[name] = Task(
-            func, name=name, sig=sig, description=description
-        )
+        self.inner[name] = Task(func, name=name, sig=sig, description=description)
         logger.debug(f"registered task: {name}")
 
     def get(self, name: str) -> Task[..., object]:

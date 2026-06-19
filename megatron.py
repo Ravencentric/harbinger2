@@ -17,7 +17,7 @@ def listdir() -> None:
 
 
 @task(name="greet", description="Greet someone N times")
-def greet(name: str = "World", count: int = 1, *, loud: bool = False) -> None:
+def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
     msg = f"Hello, {name}!" if not loud else f"HELLO, {name.upper()}!"
     for _ in range(count):
         print(msg)

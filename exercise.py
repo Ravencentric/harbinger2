@@ -4,7 +4,7 @@ import subprocess
 
 
 def run(label: str, *args: str) -> None:
-    print(f"\n── {label} ──")
+    print(f"\n-- {label} --")
     subprocess.run(["uv", "run", "harbinger", *args])
 
 
@@ -21,5 +21,5 @@ run("Invoke: cat", "cat", "--", "pyproject.toml")
 run("Invoke: cat --numbered", "cat", "--", "pyproject.toml", "--numbered")
 run("Per-task help", "greet", "--", "--help")
 run("Error: unknown task", "nonexistent")
-run("Error: missing arg", "greet", "--")
+run("Invoke: greet default", "greet", "--")
 run("Error: bad type", "add", "--", "hello", "world")
