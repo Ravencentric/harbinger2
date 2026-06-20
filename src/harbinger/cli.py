@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import inspect
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -18,7 +17,7 @@ from .errors import (
     UndefinedTaskNameError,
 )
 from .registry import load
-from .typs import Task
+from .typs import ParameterKind, Task
 
 # ── Command sum type ──────────────────────────────────────────────
 
@@ -71,19 +70,15 @@ class Subparser:
             description=self.task.description,
         )
 
-        sig = self.task.sig
-
-        for name, param in sig.parameters.items():
-            anno = (
-                param.annotation
-                if param.annotation is not inspect.Parameter.empty
-                else str
-            )
-            is_keyword = param.kind is inspect.Parameter.KEYWORD_ONLY
+        for param in self.task.signature.parameters:
+            is_keyword = param.kind is ParameterKind.KEYWORD
 
             if is_keyword:
-                flag = f"--{name.replace('_', '-')}"
-                if anno is bool:
+                flag = f"--{param.name.replace('_', '-')}"
+                # ponytail: the one piece of presentation logic in the consumer.
+                # Signature stays presentation-agnostic; a future non-CLI
+                # consumer isn't forced into flag semantics.
+                if param.converter is bool:
                     parser.add_argument(
                         flag,
                         action=argparse.BooleanOptionalAction,
@@ -93,15 +88,15 @@ class Subparser:
                 else:
                     parser.add_argument(
                         flag,
-                        type=anno,
+                        type=param.converter,
                         default=param.default,
                         help=f"default: {param.default!r}",
                     )
             else:
                 # ponytail: positional — no bool handling, bool positionals are weird anyway
                 parser.add_argument(
-                    name,
-                    type=anno,
+                    param.name,
+                    type=param.converter,
                     nargs="?",
                     default=param.default,
                     help=f"default: {param.default!r}",
@@ -113,10 +108,10 @@ class Subparser:
         positional: list[object] = []
         keyword: dict[str, object] = {}
 
-        for name, param in sig.parameters.items():
-            val = getattr(ns, name.replace("-", "_"))
-            if param.kind is inspect.Parameter.KEYWORD_ONLY:
-                keyword[name] = val
+        for param in self.task.signature.parameters:
+            val = getattr(ns, param.name)
+            if param.kind is ParameterKind.KEYWORD:
+                keyword[param.name] = val
             else:
                 positional.append(val)
 
@@ -213,7 +208,7 @@ def main() -> int:
                 list_tasks()
             case RunSelected(names=names):
                 for name in names:
-                    REGISTRY.call(name)
+                    REGISTRY.run(name)
             case Invoke(name=name, argv=argv):
                 task = REGISTRY.get(name)
                 pos, kw = Subparser(task).parse(argv)
