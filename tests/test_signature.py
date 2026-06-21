@@ -1,10 +1,9 @@
-import inspect
 from pathlib import Path
 
 import pytest
 
 from harbinger.errors import TaskDefinitionError
-from harbinger.typs import ParameterKind, Signature
+from harbinger.signature import ParameterKind, Signature
 
 
 def _parse(fn: object) -> Signature:

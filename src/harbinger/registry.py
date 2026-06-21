@@ -13,10 +13,11 @@ from .errors import (
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .typs import Signature, Task, TaskFn, TaskSpec
+from .model import Task, TaskFn, TaskSpec
+from .signature import Signature
 
 if TYPE_CHECKING:
-    from .typs import P, R, TaskDecorator
+    from .model import P, R, TaskDecorator
 
 logger = logging.getLogger(__name__)
 

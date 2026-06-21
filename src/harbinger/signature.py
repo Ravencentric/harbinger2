@@ -1,35 +1,17 @@
+from __future__ import annotations
+
 import inspect
 from collections.abc import Callable
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
+from typing import Any, final
 
-from .errors import TaskDefinitionError, TaskError
-
-P = ParamSpec("P")
-R = TypeVar("R", covariant=True)
-
-
-class TaskFn(Protocol, Generic[P, R]):
-    @property
-    def __name__(self) -> str: ...
-
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-
-
-TaskDecorator: TypeAlias = Callable[[TaskFn[P, R]], TaskFn[P, R]]
+from .errors import TaskDefinitionError
 
 
 class ParameterKind(IntEnum):
     POSITIONAL = 0
     KEYWORD = 1
-
-
-@final
-@dataclass(frozen=True, slots=True)
-class TaskSpec:
-    name: str | None = None
-    description: str | None = None
 
 
 # ponytail: Parameter/Signature are constructed only by Signature.parse; the
@@ -52,7 +34,7 @@ class Signature:
     parameters: tuple[Parameter, ...]
 
     @classmethod
-    def parse(cls, func: TaskFn[..., object], *, task_name: str) -> "Signature":
+    def parse(cls, func: Callable[..., object], *, task_name: str) -> Signature:
         sig = inspect.signature(func)
         parameters: list[Parameter] = []
         for param in sig.parameters.values():
@@ -103,21 +85,3 @@ class Signature:
             )
 
         return cls(parameters=tuple(parameters))
-
-
-@final
-@dataclass(frozen=True, slots=True)
-class Task:
-    func: Callable[..., object]
-    _: KW_ONLY
-    name: str
-    signature: Signature
-    description: str | None = None
-
-    def call(self, *args: object, **kwargs: object) -> object:
-        try:
-            result = self.func(*args, **kwargs)
-        except Exception as source:
-            raise TaskError(self.name) from source
-        else:
-            return result

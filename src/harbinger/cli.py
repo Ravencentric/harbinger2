@@ -16,7 +16,8 @@ from .errors import (
     UndefinedTaskNameError,
 )
 from .registry import TaskRegistry, load
-from .typs import ParameterKind, Task
+from .model import Task
+from .signature import ParameterKind
 
 TASKFILE: Final = "tasks.py"
 
