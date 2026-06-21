@@ -21,11 +21,6 @@ class ParameterKind(IntEnum):
     KEYWORD = 1
 
 
-# ponytail: Parameter/Signature are constructed only by Signature.parse; the
-# invariants (default is never empty, converter is a 1-arg callable, name is a
-# legal identifier) are established there and not re-checked. Convention-only,
-# no __post_init__ guards. `kind` is narrowed to ParameterKind so VAR_POSITIONAL
-# / VAR_KEYWORD are unrepresentable at the type level, not just filtered.
 @final
 @dataclass(frozen=True, slots=True)
 class Parameter:
@@ -45,6 +40,7 @@ class Signature:
         name = func.__name__
         sig = inspect.signature(func)
         parameters: list[Parameter] = []
+
         for param in sig.parameters.values():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
                 raise TaskDefinitionError(

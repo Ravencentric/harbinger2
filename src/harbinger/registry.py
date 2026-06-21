@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MARKER: Final = "_harbinger_task"
+MARKER: Final = "__harbinger_task__"
 
 
 @overload
