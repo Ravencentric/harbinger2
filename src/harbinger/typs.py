@@ -13,6 +13,7 @@ R = TypeVar("R", covariant=True)
 class TaskFn(Protocol, Generic[P, R]):
     @property
     def __name__(self) -> str: ...
+
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
@@ -24,10 +25,18 @@ class ParameterKind(IntEnum):
     KEYWORD = 1
 
 
+@final
+@dataclass(frozen=True, slots=True)
+class TaskSpec:
+    name: str | None = None
+    description: str | None = None
+
+
 # ponytail: Parameter/Signature are constructed only by Signature.parse; the
-# invariants (default is never empty, converter is a 1-arg callable, kind maps
-# to a real param.kind, name is a legal identifier) are established there and
-# not re-checked. Convention-only, no __post_init__ guards.
+# invariants (default is never empty, converter is a 1-arg callable, name is a
+# legal identifier) are established there and not re-checked. Convention-only,
+# no __post_init__ guards. `kind` is narrowed to ParameterKind so VAR_POSITIONAL
+# / VAR_KEYWORD are unrepresentable at the type level, not just filtered.
 @final
 @dataclass(frozen=True, slots=True)
 class Parameter:
@@ -98,14 +107,14 @@ class Signature:
 
 @final
 @dataclass(frozen=True, slots=True)
-class Task(Generic[P, R]):
-    func: TaskFn[P, R]
+class Task:
+    func: Callable[..., object]
     _: KW_ONLY
     name: str
     signature: Signature
     description: str | None = None
 
-    def call(self, *args: P.args, **kwargs: P.kwargs) -> R:
+    def call(self, *args: object, **kwargs: object) -> object:
         try:
             result = self.func(*args, **kwargs)
         except Exception as source:

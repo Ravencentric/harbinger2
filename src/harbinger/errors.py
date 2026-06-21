@@ -1,9 +1,14 @@
+from pathlib import Path
+
+
 class HarbingerError(Exception):
     pass
 
 
 class TaskFileNotFoundError(HarbingerError):
-    pass
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.path = path
 
 
 class InvalidTaskFileError(HarbingerError):
@@ -11,11 +16,15 @@ class InvalidTaskFileError(HarbingerError):
 
 
 class UndefinedTaskNameError(HarbingerError):
-    pass
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name
 
 
 class TaskError(HarbingerError):
-    pass
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name
 
 
 class DuplicateTaskError(HarbingerError):

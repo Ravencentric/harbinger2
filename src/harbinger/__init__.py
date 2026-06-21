@@ -1,5 +1,5 @@
 from typing import Final
 
-from .core import task
+from .registry import task
 
 __all__: Final = ("task",)

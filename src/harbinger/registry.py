@@ -1,79 +1,115 @@
-import dataclasses
+from __future__ import annotations
+
 import importlib.util
 import logging
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Final, overload
 
 from .errors import (
     DuplicateTaskError,
     InvalidTaskFileError,
+    TaskDefinitionError,
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .typs import Signature, Task, TaskFn
+from .typs import Signature, Task, TaskFn, TaskSpec
+
+if TYPE_CHECKING:
+    from .typs import P, R, TaskDecorator
 
 logger = logging.getLogger(__name__)
 
+_MARKER: Final = "_harbinger_task"
 
-def load(taskfile: Path) -> None:
-    """Import a taskfile, populating the global registry via @task decorators."""
-    if not taskfile.is_file():
-        raise TaskFileNotFoundError(taskfile)
 
-    spec = importlib.util.spec_from_file_location(taskfile.stem, taskfile)
+@overload
+def task(fn: TaskFn[P, R], /) -> TaskFn[P, R]: ...
 
+
+@overload
+def task(
+    *, name: str | None = None, description: str | None = None
+) -> TaskDecorator[P, R]: ...
+
+
+def task(
+    fn: TaskFn[P, R] | None = None,
+    /,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+) -> TaskFn[P, R] | TaskDecorator[P, R]:
+    spec = TaskSpec(name=name, description=description)
+
+    def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
+        if getattr(fn, _MARKER, None) is not None:
+            raise TaskDefinitionError(
+                f"function {fn.__name__!r} is already a task"
+            )
+        setattr(fn, _MARKER, spec)
+        return fn
+
+    return decorator(fn) if fn is not None else decorator
+
+
+def load(path: Path) -> TaskRegistry:
+    """Import a taskfile, returning a registry built from its @task-marked functions."""
+    if not path.is_file():
+        raise TaskFileNotFoundError(path)
+
+    spec = importlib.util.spec_from_file_location(path.stem, path)
     if spec is None or spec.loader is None:
-        raise InvalidTaskFileError(taskfile)
+        raise InvalidTaskFileError(path)
 
     module = importlib.util.module_from_spec(spec)
-
     try:
         spec.loader.exec_module(module)
     except Exception as source:
-        raise InvalidTaskFileError(taskfile) from source
+        raise InvalidTaskFileError(path) from source
+
+    found: list[Task] = []
+    for obj in vars(module).values():
+        ms = getattr(obj, _MARKER, None)
+        if isinstance(ms, TaskSpec):
+            found.append(_build(obj, ms))
+    return TaskRegistry.from_tasks(found)
+
+
+def _build(func: TaskFn[..., object], spec: TaskSpec) -> Task:
+    orig = spec.name or func.__name__
+    name = orig.replace("_", "-")
+    description = spec.description
+    if description is None and func.__doc__:
+        description = func.__doc__.strip()
+    signature = Signature.parse(func, task_name=name)
+    logger.debug(f"registered task: {name}")
+    return Task(
+        func=func, name=name, signature=signature, description=description
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class TaskRegistry:
-    inner: dict[str, Task[..., object]] = dataclasses.field(default_factory=dict)
+    _tasks: dict[str, Task]
 
-    def tasks(self) -> Iterable[Task[..., object]]:
-        yield from self.inner.values()
+    @classmethod
+    def from_tasks(cls, tasks: list[Task]) -> TaskRegistry:
+        inner: dict[str, Task] = {}
+        for t in tasks:
+            if t.name in inner:
+                raise DuplicateTaskError(f"duplicate task registered: {t.name!r}")
+            inner[t.name] = t
+        return cls(_tasks=inner)
 
-    def names(self) -> Iterable[str]:
-        yield from self.inner.keys()
+    def tasks(self) -> tuple[Task, ...]:
+        return tuple(self._tasks.values())
 
-    def register(
-        self,
-        func: TaskFn[..., object],
-        /,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-    ) -> None:
-        orig = name or func.__name__
-        name = orig.replace("_", "-")
+    def names(self) -> tuple[str, ...]:
+        return tuple(self._tasks.keys())
 
-        description = description or func.__doc__
-        if description:
-            description = description.strip()
-
-        if name in self.inner:
-            raise DuplicateTaskError(f"duplicate task registered: {name!r}")
-
-        signature = Signature.parse(func, task_name=name)
-
-        self.inner[name] = Task(
-            func, name=name, signature=signature, description=description
-        )
-        logger.debug(f"registered task: {name}")
-
-    def get(self, name: str) -> Task[..., object]:
-        func = self.inner.get(name)
-        if func is None:
+    def get(self, name: str) -> Task:
+        task = self._tasks.get(name)
+        if task is None:
             raise UndefinedTaskNameError(name)
-        return func
-
-    def run(self, name: str, *args: object, **kwargs: object) -> None:
-        self.get(name).call(*args, **kwargs)
+        return task

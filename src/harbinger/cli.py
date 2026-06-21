@@ -6,18 +6,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-from typing import TypeAlias
+from typing import Final, TypeAlias
 
 from . import console
-from .core import REGISTRY, TASKFILE
 from .errors import (
     InvalidTaskFileError,
     TaskError,
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .registry import load
+from .registry import TaskRegistry, load
 from .typs import ParameterKind, Task
+
+TASKFILE: Final = "tasks.py"
 
 # ── Command sum type ──────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ class Subparser:
     ``bool`` uses ``BooleanOptionalAction`` (``--flag`` / ``--no-flag``).
     """
 
-    task: Task[..., object]
+    task: Task
 
     def parse(
         self, argv: Sequence[str]
@@ -173,8 +174,8 @@ def parse(argv: Sequence[str]) -> Command:
 # ── Display ───────────────────────────────────────────────────────
 
 
-def list_tasks() -> None:
-    tasks = tuple(REGISTRY.tasks())
+def list_tasks(registry: TaskRegistry) -> None:
+    tasks = registry.tasks()
 
     if not tasks:
         console.stdout("[dim]No tasks found.[/]")
@@ -197,25 +198,24 @@ def list_tasks() -> None:
 def main() -> int:
     try:
         command = parse(sys.argv[1:])
-
-        load(Path.cwd() / TASKFILE)
+        registry = load(Path.cwd() / TASKFILE)
 
         match command:
             case RunAll():
-                for task in REGISTRY.tasks():
+                for task in registry.tasks():
                     task.call()
             case ListTasks():
-                list_tasks()
+                list_tasks(registry)
             case RunSelected(names=names):
                 for name in names:
-                    REGISTRY.run(name)
+                    registry.get(name).call()
             case Invoke(name=name, argv=argv):
-                task = REGISTRY.get(name)
+                task = registry.get(name)
                 pos, kw = Subparser(task).parse(argv)
                 task.call(*pos, **kw)
 
-    except TaskFileNotFoundError:
-        console.error(f"task file not found: {TASKFILE}")
+    except TaskFileNotFoundError as error:
+        console.error(f"task file not found: {error.path}")
         return 1
     except InvalidTaskFileError as error:
         source = error.__cause__
@@ -223,12 +223,12 @@ def main() -> int:
         console.error(f"could not load {TASKFILE}: {message}")
         return 1
     except UndefinedTaskNameError as error:
-        console.error(f"unknown task {error.args[0]!r}")
+        console.error(f"unknown task {error.name!r}")
         return 1
     except TaskError as error:
         source = error.__cause__
         message = f"{source}" if source is not None else "unknown"
-        console.error(f"task {error.args[0]!r} failed: {message}")
+        console.error(f"task {error.name!r} failed: {message}")
         return 1
 
     return 0
