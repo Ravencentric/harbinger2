@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MARKER: Final = "_harbinger_task"
+MARKER: Final = "_harbinger_task"
 
 
 @overload
@@ -44,11 +44,11 @@ def task(
     spec = TaskSpec(name=name, description=description)
 
     def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
-        if getattr(fn, _MARKER, None) is not None:
+        if getattr(fn, MARKER, None) is not None:
             raise TaskDefinitionError(
                 f"function {fn.__name__!r} is already a task"
             )
-        setattr(fn, _MARKER, spec)
+        setattr(fn, MARKER, spec)
         return fn
 
     return decorator(fn) if fn is not None else decorator
@@ -71,19 +71,19 @@ def load(path: Path) -> TaskRegistry:
 
     found: list[Task] = []
     for obj in vars(module).values():
-        ms = getattr(obj, _MARKER, None)
+        ms = getattr(obj, MARKER, None)
         if isinstance(ms, TaskSpec):
-            found.append(_build(obj, ms))
+            found.append(build(obj, ms))
     return TaskRegistry.from_tasks(found)
 
 
-def _build(func: TaskFn[..., object], spec: TaskSpec) -> Task:
+def build(func: TaskFn[..., object], spec: TaskSpec) -> Task:
     orig = spec.name or func.__name__
     name = orig.replace("_", "-")
     description = spec.description
     if description is None and func.__doc__:
         description = func.__doc__.strip()
-    signature = Signature.parse(func, task_name=name)
+    signature = Signature.parse(func)
     logger.debug(f"registered task: {name}")
     return Task(
         func=func, name=name, signature=signature, description=description
@@ -92,7 +92,7 @@ def _build(func: TaskFn[..., object], spec: TaskSpec) -> Task:
 
 @dataclass(frozen=True, slots=True)
 class TaskRegistry:
-    _tasks: dict[str, Task]
+    store: dict[str, Task]
 
     @classmethod
     def from_tasks(cls, tasks: list[Task]) -> TaskRegistry:
@@ -101,16 +101,16 @@ class TaskRegistry:
             if t.name in inner:
                 raise DuplicateTaskError(f"duplicate task registered: {t.name!r}")
             inner[t.name] = t
-        return cls(_tasks=inner)
+        return cls(store=inner)
 
     def tasks(self) -> tuple[Task, ...]:
-        return tuple(self._tasks.values())
+        return tuple(self.store.values())
 
     def names(self) -> tuple[str, ...]:
-        return tuple(self._tasks.keys())
+        return tuple(self.store.keys())
 
     def get(self, name: str) -> Task:
-        task = self._tasks.get(name)
+        task = self.store.get(name)
         if task is None:
             raise UndefinedTaskNameError(name)
         return task

@@ -4,9 +4,12 @@ import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, final
+from typing import TYPE_CHECKING, Any, final
 
 from .errors import TaskDefinitionError
+
+if TYPE_CHECKING:
+    from .model import TaskFn
 
 
 class ParameterKind(IntEnum):
@@ -34,37 +37,35 @@ class Signature:
     parameters: tuple[Parameter, ...]
 
     @classmethod
-    def parse(cls, func: Callable[..., object], *, task_name: str) -> Signature:
+    def parse(cls, func: TaskFn[..., object]) -> Signature:
+        name = func.__name__
         sig = inspect.signature(func)
         parameters: list[Parameter] = []
         for param in sig.parameters.values():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
                 raise TaskDefinitionError(
-                    f"task {task_name!r} cannot use *{param.name}. "
+                    f"task {name!r} cannot use *{param.name}. "
                     "Harbinger requires explicit, strongly-typed parameters."
                 )
             if param.kind is inspect.Parameter.VAR_KEYWORD:
                 raise TaskDefinitionError(
-                    f"task {task_name!r} cannot use **{param.name}. "
+                    f"task {name!r} cannot use **{param.name}. "
                     "Harbinger requires explicit, strongly-typed parameters."
                 )
             if param.default is inspect.Parameter.empty:
                 raise TaskDefinitionError(
-                    f"task {task_name!r} has parameter {param.name!r} without a default. "
+                    f"task {name!r} has parameter {param.name!r} without a default. "
                     "All task parameters must have default values."
                 )
 
             anno = param.annotation
-            # ponytail: argv is strings, so `str` here is a no-op pass-through,
-            # not a coercion. `object`/`Any` = "I don't know" -> str is the
-            # sensible CLI default; only missing annotation strictly needs it.
             if anno in (inspect.Parameter.empty, str, object, Any):
                 converter = str
             elif callable(anno):
                 converter = anno
             else:
                 raise TaskDefinitionError(
-                    f"task {task_name!r} parameter {param.name!r} has invalid annotation. annotation {anno!r} is not callable"
+                    f"task {name!r} parameter {param.name!r} has invalid annotation. annotation {anno!r} is not callable"
                 )
 
             # ponytail: POSITIONAL_ONLY + POSITIONAL_OR_KEYWORD both collapse to
