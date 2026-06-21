@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, final
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final, final
 
 from .errors import TaskDefinitionError
 
 if TYPE_CHECKING:
     from .model import TaskFn
+
+SUPPORTED: Final = {str, int, bool, Path}
+NOOP: Final = {inspect.Parameter.empty, object, Any}
 
 
 class ParameterKind(IntEnum):
@@ -32,9 +36,9 @@ class Parameter:
 
 
 @final
-@dataclass(frozen=True, slots=True)
+@dataclass
 class Signature:
-    parameters: tuple[Parameter, ...]
+    parameters: Sequence[Parameter]
 
     @classmethod
     def parse(cls, func: TaskFn[..., object]) -> Signature:
@@ -59,23 +63,23 @@ class Signature:
                 )
 
             anno = param.annotation
-            if anno in (inspect.Parameter.empty, str, object, Any):
-                converter = str
-            elif callable(anno):
+            if anno in NOOP:
+                converter = lambda _: _  # noqa: E731
+            elif anno in SUPPORTED:
                 converter = anno
             else:
+                allowed = ", ".join(type.__name__ for type in SUPPORTED)
                 raise TaskDefinitionError(
-                    f"task {name!r} parameter {param.name!r} has invalid annotation. annotation {anno!r} is not callable"
+                    f"task {name!r} parameter {param.name!r} has unsupported "
+                    f"annotation {anno!r}. supported types: {allowed}"
                 )
 
-            # ponytail: POSITIONAL_ONLY + POSITIONAL_OR_KEYWORD both collapse to
-            # POSITIONAL; task params always have defaults, so the distinction
-            # is moot for invocation. KEYWORD_ONLY -> KEYWORD.
             kind = (
                 ParameterKind.KEYWORD
                 if param.kind is inspect.Parameter.KEYWORD_ONLY
                 else ParameterKind.POSITIONAL
             )
+
             parameters.append(
                 Parameter(
                     name=param.name,
@@ -85,4 +89,4 @@ class Signature:
                 )
             )
 
-        return cls(parameters=tuple(parameters))
+        return cls(parameters)

@@ -24,7 +24,7 @@ def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
 
 
 @task
-def add(a: float = 0.0, b: float = 0.0) -> None:
+def add(a: int = 0, b: int = 0) -> None:
     """Add two numbers."""
     print(f"{a} + {b} = {a + b}")
 

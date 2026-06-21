@@ -45,9 +45,7 @@ def task(
 
     def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
         if getattr(fn, MARKER, None) is not None:
-            raise TaskDefinitionError(
-                f"function {fn.__name__!r} is already a task"
-            )
+            raise TaskDefinitionError(f"function {fn.__name__!r} is already a task")
         setattr(fn, MARKER, spec)
         return fn
 
@@ -85,9 +83,7 @@ def build(func: TaskFn[..., object], spec: TaskSpec) -> Task:
         description = func.__doc__.strip()
     signature = Signature.parse(func)
     logger.debug(f"registered task: {name}")
-    return Task(
-        func=func, name=name, signature=signature, description=description
-    )
+    return Task(func=func, name=name, signature=signature, description=description)
 
 
 @dataclass(frozen=True, slots=True)
