@@ -28,6 +28,7 @@ def add(a: int = 0, b: int = 0) -> None:
     """Add two numbers."""
     print(f"{a} + {b} = {a + b}")
 
+
 @task
 def cat(path: Path = Path("README.md"), *, numbered: bool = False) -> None:
     """Print a file's contents."""

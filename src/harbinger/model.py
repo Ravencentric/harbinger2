@@ -34,8 +34,24 @@ class Task:
     func: Callable[..., object]
     _: KW_ONLY
     name: str
-    signature: Signature
     description: str | None = None
+
+    @property
+    def signature(self) -> Signature:
+        return Signature.parse(self.func)
+
+    @classmethod
+    def from_func(cls, func: TaskFn[..., object], spec: TaskSpec) -> Task:
+        name = (spec.name or func.__name__).replace("_", "-")
+        description = spec.description
+        if description is None and func.__doc__:
+            description = func.__doc__.strip()
+
+        return cls(
+            func=func,
+            name=name,
+            description=description,
+        )
 
     def call(self, *args: object, **kwargs: object) -> object:
         try:

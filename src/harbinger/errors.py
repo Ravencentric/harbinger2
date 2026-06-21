@@ -27,9 +27,5 @@ class TaskError(HarbingerError):
         self.name = name
 
 
-class DuplicateTaskError(HarbingerError):
-    pass
-
-
 class TaskDefinitionError(HarbingerError):
     pass

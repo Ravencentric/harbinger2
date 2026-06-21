@@ -15,7 +15,7 @@ from .errors import (
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .registry import TaskRegistry, load
+from .registry import TaskRegistry
 from .model import Task
 from .signature import ParameterKind
 
@@ -199,7 +199,7 @@ def list_tasks(registry: TaskRegistry) -> None:
 def main() -> int:
     try:
         command = parse(sys.argv[1:])
-        registry = load(Path.cwd() / TASKFILE)
+        registry = TaskRegistry.load(Path.cwd() / TASKFILE)
 
         match command:
             case RunAll():
