@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import dataclass
 from typing import Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
 
 from .errors import TaskError
@@ -29,10 +29,9 @@ class TaskSpec:
 
 
 @final
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Task:
-    func: Callable[..., object]
-    _: KW_ONLY
+    func: TaskFn[..., object]
     name: str
     description: str | None = None
 
@@ -53,10 +52,8 @@ class Task:
             description=description,
         )
 
-    def call(self, *args: object, **kwargs: object) -> object:
+    def call(self, *args: object, **kwargs: object) -> None:
         try:
-            result = self.func(*args, **kwargs)
+            self.func(*args, **kwargs)
         except Exception as source:
             raise TaskError(self.name) from source
-        else:
-            return result
