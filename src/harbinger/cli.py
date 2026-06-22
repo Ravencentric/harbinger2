@@ -15,9 +15,8 @@ from .errors import (
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
-from .registry import TaskRegistry
 from .model import Task
-from .signature import ParameterKind
+from .registry import TaskRegistry
 
 TASKFILE: Final = "tasks.py"
 
@@ -73,9 +72,7 @@ class Subparser:
         )
 
         for param in self.task.signature.parameters:
-            is_keyword = param.kind is ParameterKind.KEYWORD
-
-            if is_keyword:
+            if param.kind.is_keyword():
                 flag = f"--{param.name.replace('_', '-')}"
                 # ponytail: the one piece of presentation logic in the consumer.
                 # Signature stays presentation-agnostic; a future non-CLI
@@ -112,7 +109,7 @@ class Subparser:
 
         for param in self.task.signature.parameters:
             val = getattr(ns, param.name)
-            if param.kind is ParameterKind.KEYWORD:
+            if param.kind.is_keyword():
                 keyword[param.name] = val
             else:
                 positional.append(val)

@@ -20,6 +20,12 @@ class ParameterKind(IntEnum):
     POSITIONAL = 0
     KEYWORD = 1
 
+    def is_positional(self) -> bool:
+        return self is ParameterKind.POSITIONAL
+
+    def is_keyword(self) -> bool:
+        return self is ParameterKind.KEYWORD
+
 
 @final
 @dataclass(frozen=True, slots=True)
