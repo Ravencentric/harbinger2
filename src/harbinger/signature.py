@@ -4,16 +4,13 @@ import inspect
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, final
+from typing import TYPE_CHECKING, final
 
+from .coerce import converter_for
 from .errors import TaskDefinitionError
 
 if TYPE_CHECKING:
     from .model import TaskFn
-
-SUPPORTED: Final = {str, int, bool, Path}
-NOOP: Final = {inspect.Parameter.empty, object, Any}
 
 
 class ParameterKind(IntEnum):
@@ -49,31 +46,13 @@ class Signature:
 
         for param in sig.parameters.values():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                raise TaskDefinitionError(
-                    f"task {name!r} cannot use *{param.name}. "
-                    "Harbinger requires explicit, strongly-typed parameters."
-                )
+                raise TaskDefinitionError(f"task {name!r} cannot use *{param.name}.")
             if param.kind is inspect.Parameter.VAR_KEYWORD:
-                raise TaskDefinitionError(
-                    f"task {name!r} cannot use **{param.name}. "
-                    "Harbinger requires explicit, strongly-typed parameters."
-                )
+                raise TaskDefinitionError(f"task {name!r} cannot use **{param.name}.")
             if param.default is inspect.Parameter.empty:
                 raise TaskDefinitionError(
                     f"task {name!r} has parameter {param.name!r} without a default. "
                     "All task parameters must have default values."
-                )
-
-            anno = param.annotation
-            if anno in NOOP:
-                converter = lambda _: _  # noqa: E731
-            elif anno in SUPPORTED:
-                converter = anno
-            else:
-                allowed = ", ".join(type.__name__ for type in SUPPORTED)
-                raise TaskDefinitionError(
-                    f"task {name!r} parameter {param.name!r} has unsupported "
-                    f"annotation {anno!r}. supported types: {allowed}"
                 )
 
             kind = (
@@ -85,7 +64,7 @@ class Signature:
             parameters.append(
                 Parameter(
                     name=param.name,
-                    converter=converter,
+                    converter=converter_for(param.annotation),
                     default=param.default,
                     kind=kind,
                 )

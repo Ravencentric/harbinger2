@@ -1,6 +1,3 @@
-from datetime import datetime
-from pathlib import Path
-
 import pytest
 
 from harbinger.errors import TaskDefinitionError
@@ -53,18 +50,6 @@ def test_bool_annotation_is_keyword() -> None:
     assert p.kind is ParameterKind.KEYWORD
 
 
-def test_str_annotation_is_str() -> None:
-    def f(a: str = "x") -> None: ...
-
-    assert signature(f).parameters[0].converter is str
-
-
-def test_path_annotation_is_path() -> None:
-    def f(p: Path = Path(".")) -> None: ...
-
-    assert signature(f).parameters[0].converter is Path
-
-
 def test_var_positional_rejected() -> None:
     def f(*a: int) -> None: ...
 
@@ -81,20 +66,6 @@ def test_var_keyword_rejected() -> None:
 
 def test_missing_default_rejected() -> None:
     def f(a: int) -> None: ...
-
-    with pytest.raises(TaskDefinitionError):
-        signature(f)
-
-
-def test_float_annotation_rejected() -> None:
-    def f(a: float = 1.0) -> None: ...
-
-    with pytest.raises(TaskDefinitionError):
-        signature(f)
-
-
-def test_datetime_annotation_rejected() -> None:
-    def f(t: datetime = datetime(2024, 1, 1)) -> None: ...
 
     with pytest.raises(TaskDefinitionError):
         signature(f)
