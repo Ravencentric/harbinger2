@@ -15,7 +15,7 @@ def test_supported(annotation: object) -> None:
 
 
 @pytest.mark.parametrize("annotation", [object, Any, inspect.Parameter.empty])
-def test_noopr(annotation: object) -> None:
+def test_noop(annotation: object) -> None:
     assert converter_for(annotation) is identity
 
 
