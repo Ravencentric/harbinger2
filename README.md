@@ -47,9 +47,20 @@ Function names are converted from `snake_case` to `kebab-case`. A function named
 ```
 harbinger              # list available tasks
 harbinger --list       # same as above
+harbinger --default    # run default tasks only
 harbinger --all        # run all tasks
 harbinger --version    # print version
 harbinger hello        # run one or more tasks by name
+```
+
+Tasks are included in `--default` by default. Mark composite/aggregator tasks with `default=False`:
+
+```python
+@task(default=False)
+def check() -> None:
+    """Run all gates."""
+    lint()
+    test()
 ```
 
 ### Passing arguments

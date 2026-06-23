@@ -30,6 +30,11 @@ class RunAll:
 
 
 @dataclass(frozen=True, slots=True)
+class RunDefault:
+    """harbinger --default"""
+
+
+@dataclass(frozen=True, slots=True)
 class ListTasks:
     """harbinger --list"""
 
@@ -49,7 +54,7 @@ class Invoke:
     argv: tuple[str, ...]
 
 
-Command: TypeAlias = RunAll | ListTasks | RunSelected | Invoke
+Command: TypeAlias = RunAll | RunDefault | ListTasks | RunSelected | Invoke
 
 # ── Subparser ─────────────────────────────────────────────────────
 
@@ -141,6 +146,12 @@ def parse(argv: Sequence[str]) -> Command:
         help="run all tasks",
     )
     group.add_argument(
+        "-d",
+        "--default",
+        action="store_true",
+        help="run default tasks only",
+    )
+    group.add_argument(
         "-l",
         "--list",
         action="store_true",
@@ -164,6 +175,9 @@ def parse(argv: Sequence[str]) -> Command:
     if args.all:
         return RunAll()
 
+    if args.default:
+        return RunDefault()
+
     if args.list:
         return ListTasks()
 
@@ -185,7 +199,16 @@ def parse(argv: Sequence[str]) -> Command:
 # ── Display ───────────────────────────────────────────────────────
 
 
-def list_tasks(registry: TaskRegistry) -> None:
+def run(tasks: Sequence[Task], /) -> None:
+    multi = len(tasks) > 1
+    for task in tasks:
+        if multi:
+            console.stdout(f"[yellow]$[/] [cyan]{task.name}[/]")
+        task.call()
+        console.stdout("")
+
+
+def show(registry: TaskRegistry, /) -> None:
     tasks = registry.tasks()
 
     if not tasks:
@@ -193,14 +216,17 @@ def list_tasks(registry: TaskRegistry) -> None:
         return
 
     n = len(tasks)
-    console.stdout(f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'}[/]")
+    console.stdout(
+        f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'} (* = default)[/]"
+    )
     console.stdout("")
 
     width = max(len(t.name) for t in tasks)
 
     for task in tasks:
+        star = "[yellow]*[/]" if task.default else "[dim] [/]"
         desc = f"  [dim]{task.description}[/]" if task.description else ""
-        console.stdout(f"  [cyan]{task.name.ljust(width)}[/]{desc}")
+        console.stdout(f"  {star} [cyan]{task.name.ljust(width)}[/]{desc}")
 
 
 # ── Entrypoint ────────────────────────────────────────────────────
@@ -213,13 +239,17 @@ def main() -> int:
 
         match command:
             case RunAll():
-                for task in registry.tasks():
-                    task.call()
+                run(registry.tasks())
+
+            case RunDefault():
+                run(registry.default())
+
             case ListTasks():
-                list_tasks(registry)
+                show(registry)
+
             case RunSelected(names=names):
-                for name in names:
-                    registry.get(name).call()
+                run([registry.get(name) for name in names])
+
             case Invoke(name=name, argv=argv):
                 task = registry.get(name)
                 pos, kw = Subparser(task).parse(argv)

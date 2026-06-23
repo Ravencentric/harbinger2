@@ -12,6 +12,7 @@ class Style(IntEnum):
     """
 
     RESET = 0
+    YELLOW = 33
     CYAN = 36
     RED = 31
     DIM = 90

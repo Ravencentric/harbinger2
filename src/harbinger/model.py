@@ -26,6 +26,7 @@ TaskDecorator: TypeAlias = Callable[[TaskFn[P, R]], TaskFn[P, R]]
 class TaskSpec:
     name: str | None = None
     description: str | None = None
+    default: bool = True
 
 
 @final
@@ -34,6 +35,7 @@ class Task:
     func: TaskFn[..., object]
     name: str
     description: str | None = None
+    default: bool = True
     signature: Signature
 
     @classmethod
@@ -47,6 +49,7 @@ class Task:
             func=func,
             name=name,
             description=description,
+            default=spec.default,
             signature=Signature.parse(func),
         )
 

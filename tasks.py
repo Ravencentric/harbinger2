@@ -1,36 +1,41 @@
-import os
-from pathlib import Path
+import subprocess
 
 from harbinger import task
 
-
-@task
-def hello() -> None:
-    """Print a small greeting."""
-    print("Hello")
+base = ["uv", "run"]
 
 
 @task
-def listdir() -> None:
-    """List files in the current directory."""
-    print(*os.listdir(), sep="\n")
-
-
-@task(name="greet", description="Greet someone N times")
-def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
-    msg = f"Hello, {name}!" if not loud else f"HELLO, {name.upper()}!"
-    for _ in range(count):
-        print(msg)
+def lint() -> None:
+    """Run the ruff linter."""
+    subprocess.run(base + ["ruff", "check", "."], check=True)
 
 
 @task
-def add(a: int = 0, b: int = 0) -> None:
-    """Add two numbers."""
-    print(f"{a} + {b} = {a + b}")
+def format(*, check: bool = False) -> None:
+    """Format code with ruff."""
+    cmd = ["ruff", "format", "."]
+    if check:
+        cmd.append("--check")
+    subprocess.run(base + cmd, check=True)
 
 
 @task
-def cat(path: Path = Path("README.md"), *, numbered: bool = False) -> None:
-    """Print a file's contents."""
-    for i, line in enumerate(path.read_text().splitlines(), 1):
-        print(f"{i:4d}  {line}" if numbered else line)
+def typecheck() -> None:
+    """Run the pyrefly type checker."""
+    subprocess.run(base + ["pyrefly", "check"], check=True)
+
+
+@task
+def test() -> None:
+    """Run the test suite."""
+    subprocess.run(base + ["pytest"], check=True)
+
+
+@task(default=False)
+def check() -> None:
+    """Run all static gates (lint, format-check, typecheck, test)."""
+    lint()
+    format(check=True)
+    typecheck()
+    test()

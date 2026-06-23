@@ -25,7 +25,10 @@ def task(fn: TaskFn[P, R], /) -> TaskFn[P, R]: ...
 
 @overload
 def task(
-    *, name: str | None = None, description: str | None = None
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    default: bool = True,
 ) -> TaskDecorator[P, R]: ...
 
 
@@ -35,8 +38,9 @@ def task(
     *,
     name: str | None = None,
     description: str | None = None,
+    default: bool = True,
 ) -> TaskFn[P, R] | TaskDecorator[P, R]:
-    spec = TaskSpec(name=name, description=description)
+    spec = TaskSpec(name=name, description=description, default=default)
 
     def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
         if getattr(fn, MARKER, None) is not None:
@@ -79,6 +83,9 @@ class TaskRegistry:
 
     def tasks(self) -> tuple[Task, ...]:
         return tuple(self.store.values())
+
+    def default(self) -> tuple[Task, ...]:
+        return tuple(t for t in self.store.values() if t.default)
 
     def names(self) -> tuple[str, ...]:
         return tuple(self.store.keys())
