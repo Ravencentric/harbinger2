@@ -9,7 +9,7 @@ from harbinger.coerce import converter_for, identity
 from harbinger.errors import TaskDefinitionError
 
 
-@pytest.mark.parametrize("annotation", [int, str, bool, Path])
+@pytest.mark.parametrize("annotation", [int, str, float, bool, Path])
 def test_supported(annotation: object) -> None:
     assert converter_for(annotation) is annotation
 
@@ -19,7 +19,7 @@ def test_noop(annotation: object) -> None:
     assert converter_for(annotation) is identity
 
 
-@pytest.mark.parametrize("annotation", [float, datetime])
+@pytest.mark.parametrize("annotation", [bytes, datetime])
 def test_unsupported_rejected(annotation: object) -> None:
     with pytest.raises(TaskDefinitionError):
         converter_for(annotation)

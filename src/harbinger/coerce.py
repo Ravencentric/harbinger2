@@ -11,7 +11,7 @@ T = TypeVar("T")
 
 ConverterFn: TypeAlias = Callable[[str], object]
 
-SUPPORTED: Final[set[ConverterFn]] = {str, int, bool, Path}
+SUPPORTED: Final[set[ConverterFn]] = {str, int, float, bool, Path}
 NOOP: Final[set[object]] = {inspect.Parameter.empty, object, Any}
 
 

@@ -10,6 +10,7 @@ from typing import Final, TypeAlias
 
 from . import console
 from .errors import (
+    HarbingerError,
     InvalidTaskFileError,
     TaskError,
     TaskFileNotFoundError,
@@ -25,7 +26,7 @@ TASKFILE: Final = "tasks.py"
 
 @dataclass(frozen=True, slots=True)
 class RunAll:
-    """harbinger"""
+    """harbinger --all"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +90,7 @@ class Subparser:
                         flag,
                         type=param.converter,
                         default=param.default,
-                        help=f"default: {param.default!r}",
+                        help=f"default: {param.default}",
                     )
             else:
                 parser.add_argument(
@@ -97,7 +98,7 @@ class Subparser:
                     type=param.converter,
                     nargs="?",
                     default=param.default,
-                    help=f"default: {param.default!r}",
+                    help=f"default: {param.default}",
                 )
 
         ns = parser.parse_args(list(argv))
@@ -120,7 +121,8 @@ class Subparser:
 
 
 def parse(argv: Sequence[str]) -> Command:
-    if "--" in argv:
+    has_dash = "--" in argv
+    if has_dash:
         pivot = list(argv).index("--")
         head, tail = argv[:pivot], argv[pivot + 1 :]
     else:
@@ -132,6 +134,12 @@ def parse(argv: Sequence[str]) -> Command:
     )
 
     group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        help="run all tasks",
+    )
     group.add_argument(
         "-l",
         "--list",
@@ -148,10 +156,13 @@ def parse(argv: Sequence[str]) -> Command:
         "tasks",
         metavar="<task>",
         nargs="*",
-        help="tasks to run; runs all tasks when omitted",
+        help="tasks to run; lists tasks when omitted",
     )
 
     args = parser.parse_args(list(head))
+
+    if args.all:
+        return RunAll()
 
     if args.list:
         return ListTasks()
@@ -162,10 +173,13 @@ def parse(argv: Sequence[str]) -> Command:
             parser.error("exactly one task must precede '--'")
         return Invoke(name=tasks[0], argv=tuple(tail))
 
+    if has_dash and not args.tasks:
+        parser.error("no task specified before '--'")
+
     if args.tasks:
         return RunSelected(names=tuple(args.tasks))
 
-    return RunAll()
+    return ListTasks()
 
 
 # ── Display ───────────────────────────────────────────────────────
@@ -216,8 +230,8 @@ def main() -> int:
         return 1
     except InvalidTaskFileError as error:
         source = error.__cause__
-        message = f"{source}" if source is not None else f"{error}"
-        console.error(f"could not load {TASKFILE}: {message}")
+        detail = f": {source}" if source is not None else ""
+        console.error(f"could not load {error.path}{detail}")
         return 1
     except UndefinedTaskNameError as error:
         console.error(f"unknown task {error.name!r}")
@@ -226,6 +240,9 @@ def main() -> int:
         source = error.__cause__
         message = f"{source}" if source is not None else "unknown"
         console.error(f"task {error.name!r} failed: {message}")
+        return 1
+    except HarbingerError as error:
+        console.error(f"{error}")
         return 1
 
     return 0

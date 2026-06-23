@@ -71,6 +71,8 @@ class TaskRegistry:
             spec = getattr(obj, MARKER, None)
             if spec is not None:
                 task = Task.from_func(obj, spec)
+                if task.name in store:
+                    raise TaskDefinitionError(f"duplicate task name {task.name!r}")
                 store[task.name] = task
 
         return cls(store=store)

@@ -8,8 +8,9 @@ def run(label: str, *args: str) -> None:
     subprocess.run(["uv", "run", "harbinger", *args])
 
 
-run("RunAll")
+run("NoArgs (lists)")
 run("ListTasks", "--list")
+run("RunAll", "--all")
 run("Version", "--version")
 run("RunSelected", "hello")
 run("Invoke: greet", "greet", "--", "Alice")
@@ -23,3 +24,4 @@ run("Per-task help", "greet", "--", "--help")
 run("Error: unknown task", "nonexistent")
 run("Invoke: greet default", "greet", "--")
 run("Error: bad type", "add", "--", "hello", "world")
+run("Error: bare --", "--")

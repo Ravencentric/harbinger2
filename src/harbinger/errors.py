@@ -12,7 +12,9 @@ class TaskFileNotFoundError(HarbingerError):
 
 
 class InvalidTaskFileError(HarbingerError):
-    pass
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.path = path
 
 
 class UndefinedTaskNameError(HarbingerError):

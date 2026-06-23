@@ -54,7 +54,10 @@ class Signature:
                     f"task {name!r} has parameter {param.name!r} without a default. "
                     "All task parameters must have default values."
                 )
-            if param.annotation is bool and param.kind is not inspect.Parameter.KEYWORD_ONLY:
+            if (
+                param.annotation is bool
+                and param.kind is not inspect.Parameter.KEYWORD_ONLY
+            ):
                 raise TaskDefinitionError(
                     f"task {name!r} has positional bool parameter {param.name!r}; "
                     f"bool parameters must be keyword-only (use '*, {param.name}: bool = ...')."

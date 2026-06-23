@@ -1,7 +1,7 @@
 [project]
 name = "harbinger"
 version = "0.1.0"
-description = "Add your description here"
+description = "A minimal, correct, user-friendly task runner"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
