@@ -92,7 +92,6 @@ class Subparser:
                         help=f"default: {param.default!r}",
                     )
             else:
-                # ponytail: positional — no bool handling, bool positionals are weird anyway
                 parser.add_argument(
                     param.name,
                     type=param.converter,

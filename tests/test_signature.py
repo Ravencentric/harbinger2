@@ -69,3 +69,10 @@ def test_missing_default_rejected() -> None:
 
     with pytest.raises(TaskDefinitionError):
         signature(f)
+
+
+def test_positional_bool_rejected() -> None:
+    def f(loud: bool = False) -> None: ...
+
+    with pytest.raises(TaskDefinitionError):
+        signature(f)
