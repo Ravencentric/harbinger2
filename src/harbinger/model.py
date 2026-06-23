@@ -34,10 +34,7 @@ class Task:
     func: TaskFn[..., object]
     name: str
     description: str | None = None
-
-    @property
-    def signature(self) -> Signature:
-        return Signature.parse(self.func)
+    signature: Signature
 
     @classmethod
     def from_func(cls, func: TaskFn[..., object], spec: TaskSpec) -> Task:
@@ -50,6 +47,7 @@ class Task:
             func=func,
             name=name,
             description=description,
+            signature=Signature.parse(func),
         )
 
     def call(self, *args: object, **kwargs: object) -> None:

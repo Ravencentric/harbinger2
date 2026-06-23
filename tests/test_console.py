@@ -18,10 +18,9 @@ def test_stdout_stderr(capsys: CaptureFixture[str]) -> None:
 
 
 def test_render(monkeypatch: MonkeyPatch) -> None:
-    text = "[green]green[/] [cyan]cyan[/] [red]red[/] [dim]dim[/] normal"
-    plain = "green cyan red dim normal"
+    text = "[cyan]cyan[/] [red]red[/] [dim]dim[/] normal"
+    plain = "cyan red dim normal"
     rendered = (
-        f"{Style.GREEN}green{Style.RESET} "
         f"{Style.CYAN}cyan{Style.RESET} "
         f"{Style.RED}red{Style.RESET} "
         f"{Style.DIM}dim{Style.RESET} "
