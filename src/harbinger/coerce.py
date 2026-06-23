@@ -9,9 +9,9 @@ from .errors import TaskDefinitionError
 
 T = TypeVar("T")
 
-Converter: TypeAlias = Callable[[str], object]
+ConverterFn: TypeAlias = Callable[[str], object]
 
-SUPPORTED: Final[set[Converter]] = {str, int, bool, Path}
+SUPPORTED: Final[set[ConverterFn]] = {str, int, bool, Path}
 NOOP: Final[set[object]] = {inspect.Parameter.empty, object, Any}
 
 
@@ -19,11 +19,11 @@ def identity(o: T) -> T:
     return o
 
 
-def converter_for(annotation: object) -> Converter:
+def converter_for(annotation: object) -> ConverterFn:
     if annotation in NOOP:
         return identity
     if annotation in SUPPORTED:
-        return cast(Converter, annotation)
+        return cast(ConverterFn, annotation)
     allowed = ", ".join(t.__name__ for t in SUPPORTED)
     raise TaskDefinitionError(
         f"unsupported annotation {annotation!r}. supported types: {allowed}"
