@@ -1,27 +1,14 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
-from pathlib import Path
 from typing import Final, TypeAlias
 
-from . import console
-from .errors import (
-    HarbingerError,
-    InvalidTaskFileError,
-    TaskError,
-    TaskFileNotFoundError,
-    UndefinedTaskNameError,
-)
-from .model import Task
-from .registry import TaskRegistry
+from ..model import Task
 
 TASKFILE: Final = "tasks.py"
-
-# ── Command sum type ──────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,8 +42,6 @@ class Invoke:
 
 
 Command: TypeAlias = RunAll | RunDefault | ListTasks | RunSelected | Invoke
-
-# ── Subparser ─────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,9 +105,6 @@ class Subparser:
                 positional.append(val)
 
         return tuple(positional), keyword
-
-
-# ── Parser ────────────────────────────────────────────────────────
 
 
 def parse(argv: Sequence[str]) -> Command:
@@ -194,85 +176,3 @@ def parse(argv: Sequence[str]) -> Command:
         return RunSelected(names=tuple(args.tasks))
 
     return ListTasks()
-
-
-# ── Display ───────────────────────────────────────────────────────
-
-
-def run(tasks: Sequence[Task], /) -> None:
-    multi = len(tasks) > 1
-    for task in tasks:
-        if multi:
-            console.stdout(f"[yellow]$[/] [cyan]{task.name}[/]")
-        task.call()
-        console.stdout("")
-
-
-def show(registry: TaskRegistry, /) -> None:
-    tasks = registry.tasks()
-
-    if not tasks:
-        console.stdout("[dim]No tasks found.[/]")
-        return
-
-    n = len(tasks)
-    console.stdout(
-        f"{TASKFILE}: [dim]{n} {'task' if n == 1 else 'tasks'} (* = default)[/]"
-    )
-    console.stdout("")
-
-    width = max(len(t.name) for t in tasks)
-
-    for task in tasks:
-        star = "[yellow]*[/]" if task.default else "[dim] [/]"
-        desc = f"  [dim]{task.description}[/]" if task.description else ""
-        console.stdout(f"  {star} [cyan]{task.name.ljust(width)}[/]{desc}")
-
-
-# ── Entrypoint ────────────────────────────────────────────────────
-
-
-def main() -> int:
-    try:
-        command = parse(sys.argv[1:])
-        registry = TaskRegistry.load(Path.cwd() / TASKFILE)
-
-        match command:
-            case RunAll():
-                run(registry.tasks())
-
-            case RunDefault():
-                run(registry.default())
-
-            case ListTasks():
-                show(registry)
-
-            case RunSelected(names=names):
-                run([registry.get(name) for name in names])
-
-            case Invoke(name=name, argv=argv):
-                task = registry.get(name)
-                pos, kw = Subparser(task).parse(argv)
-                task.call(*pos, **kw)
-
-    except TaskFileNotFoundError as error:
-        console.error(f"task file not found: {error.path}")
-        return 1
-    except InvalidTaskFileError as error:
-        source = error.__cause__
-        detail = f": {source}" if source is not None else ""
-        console.error(f"could not load {error.path}{detail}")
-        return 1
-    except UndefinedTaskNameError as error:
-        console.error(f"unknown task {error.name!r}")
-        return 1
-    except TaskError as error:
-        source = error.__cause__
-        message = f"{source}" if source is not None else "unknown"
-        console.error(f"task {error.name!r} failed: {message}")
-        return 1
-    except HarbingerError as error:
-        console.error(f"{error}")
-        return 1
-
-    return 0

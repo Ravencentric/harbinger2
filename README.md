@@ -94,6 +94,23 @@ Every task parameter **must have a default value**. Supported annotations:
 
 Unannotated parameters are treated as `str`. `bool` parameters expose `--flag` / `--no-flag`. `*args` and `**kwargs` are not supported.
 
+## Errors
+
+Harbinger exits `0` on success, `2` on usage errors, and `1` on any other failure. When a task fails, the error and its full cause chain are printed:
+
+    error: task 'deploy' failed
+
+    caused by:
+        0: region 'us-east-1' is unreachable
+           in _upload() at tasks.py:51
+        1: connection refused for us-east-1
+           in _connect() at tasks.py:47
+
+- `task file not found: <path>` — no `tasks.py` in the working directory.
+- `unknown task '<name>'` — includes a "did you mean" suggestion when a name is close.
+- `could not load <path>` — `tasks.py` raised at import; the cause chain shows why.
+- `task '<name>' failed` — a task raised; the cause chain shows the root error.
+
 ## Task file
 
 The task file is always `tasks.py` in the current working directory. It runs as a standalone module — import only installed packages, not sibling files.

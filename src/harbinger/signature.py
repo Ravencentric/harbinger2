@@ -46,9 +46,15 @@ class Signature:
 
         for param in sig.parameters.values():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                raise TaskDefinitionError(f"task {name!r} cannot use *{param.name}.")
+                raise TaskDefinitionError(
+                    f"task {name!r} cannot use *{param.name} "
+                    "(variadic positional args are not supported; list parameters explicitly)."
+                )
             if param.kind is inspect.Parameter.VAR_KEYWORD:
-                raise TaskDefinitionError(f"task {name!r} cannot use **{param.name}.")
+                raise TaskDefinitionError(
+                    f"task {name!r} cannot use **{param.name} "
+                    "(variadic keyword args are not supported; list parameters explicitly)."
+                )
             if param.default is inspect.Parameter.empty:
                 raise TaskDefinitionError(
                     f"task {name!r} has parameter {param.name!r} without a default. "
@@ -69,10 +75,17 @@ class Signature:
                 else ParameterKind.POSITIONAL
             )
 
+            try:
+                converter = converter_for(param.annotation)
+            except TaskDefinitionError as source:
+                raise TaskDefinitionError(
+                    f"task {name!r} parameter {param.name!r}: {source}"
+                ) from source
+
             parameters.append(
                 Parameter(
                     name=param.name,
-                    converter=converter_for(param.annotation),
+                    converter=converter,
                     default=param.default,
                     kind=kind,
                 )

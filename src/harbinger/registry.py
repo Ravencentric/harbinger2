@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, overload
@@ -65,8 +66,12 @@ class TaskRegistry:
             raise InvalidTaskFileError(path)
 
         module = importlib.util.module_from_spec(spec)
+
         try:
             spec.loader.exec_module(module)
+        except TaskDefinitionError:
+            raise
+
         except Exception as source:
             raise InvalidTaskFileError(path) from source
 
@@ -90,8 +95,14 @@ class TaskRegistry:
     def names(self) -> tuple[str, ...]:
         return tuple(self.store.keys())
 
+    def select(self, names: Sequence[str]) -> tuple[Task, ...]:
+        missing = tuple(n for n in names if n not in self.store)
+        if missing:
+            raise UndefinedTaskNameError(missing)
+        return tuple(self.store[n] for n in names)
+
     def get(self, name: str) -> Task:
         task = self.store.get(name)
         if task is None:
-            raise UndefinedTaskNameError(name)
+            raise UndefinedTaskNameError((name,))
         return task

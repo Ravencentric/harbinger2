@@ -1,7 +1,7 @@
 from pytest import CaptureFixture, MonkeyPatch
 
-from harbinger import console
-from harbinger.console import Style
+from harbinger.cli import console
+from harbinger.cli.console import Style
 
 
 def test_style() -> None:
