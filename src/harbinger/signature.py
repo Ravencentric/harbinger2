@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING, final
+from typing import TYPE_CHECKING, Self, Sequence, final
 
 from .coerce import converter_for
-from .errors import TaskDefinitionError
+from .errors import (
+    MissingDefaultError,
+    MixedVariadicSignatureError,
+    PositionalBoolError,
+    UnsupportedAnnotationError,
+    VarKeywordError,
+)
 
 if TYPE_CHECKING:
     from .model import TaskFn
@@ -34,61 +40,82 @@ class Parameter:
 
 
 @final
-@dataclass
-class Signature:
+@dataclass(frozen=True, slots=True)
+class FixedSignature:
     parameters: Sequence[Parameter]
 
+
+@final
+@dataclass(frozen=True, slots=True)
+class VariadicSignature:
+    name: str
+    converter: Callable[[str], object]
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class Signature:
+    signature: FixedSignature | VariadicSignature
+
     @classmethod
-    def parse(cls, func: TaskFn[..., object]) -> Signature:
+    def parse(cls, func: TaskFn[..., object]) -> Self:
         name = func.__name__
-        sig = inspect.signature(func)
+        params = tuple(inspect.signature(func).parameters.values())
+
+        if len(params) == 1 and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
+            param = params[0]
+            converter = converter_for(param.annotation)
+            if converter is None:
+                raise UnsupportedAnnotationError(
+                    param.annotation,
+                    task=name,
+                    param=param.name,
+                )
+
+            return cls(
+                VariadicSignature(
+                    name=param.name,
+                    converter=converter,
+                )
+            )
+
         parameters: list[Parameter] = []
 
-        for param in sig.parameters.values():
-            if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                raise TaskDefinitionError(
-                    f"task {name!r} cannot use *{param.name} "
-                    "(variadic positional args are not supported; list parameters explicitly)."
-                )
+        for param in params:
             if param.kind is inspect.Parameter.VAR_KEYWORD:
-                raise TaskDefinitionError(
-                    f"task {name!r} cannot use **{param.name} "
-                    "(variadic keyword args are not supported; list parameters explicitly)."
-                )
+                raise VarKeywordError(name, param.name)
+
+            if param.kind is inspect.Parameter.VAR_POSITIONAL:
+                raise MixedVariadicSignatureError(name, param.name)
+
             if param.default is inspect.Parameter.empty:
-                raise TaskDefinitionError(
-                    f"task {name!r} has parameter {param.name!r} without a default. "
-                    "All task parameters must have default values."
-                )
+                raise MissingDefaultError(name, param.name)
+
             if (
                 param.annotation is bool
                 and param.kind is not inspect.Parameter.KEYWORD_ONLY
             ):
-                raise TaskDefinitionError(
-                    f"task {name!r} has positional bool parameter {param.name!r}; "
-                    f"bool parameters must be keyword-only (use '*, {param.name}: bool = ...')."
+                raise PositionalBoolError(name, param.name)
+
+            converter = converter_for(param.annotation)
+            if converter is None:
+                raise UnsupportedAnnotationError(
+                    param.annotation,
+                    task=name,
+                    param=param.name,
                 )
-
-            kind = (
-                ParameterKind.KEYWORD
-                if param.kind is inspect.Parameter.KEYWORD_ONLY
-                else ParameterKind.POSITIONAL
-            )
-
-            try:
-                converter = converter_for(param.annotation)
-            except TaskDefinitionError as source:
-                raise TaskDefinitionError(
-                    f"task {name!r} parameter {param.name!r}: {source}"
-                ) from source
 
             parameters.append(
                 Parameter(
                     name=param.name,
                     converter=converter,
                     default=param.default,
-                    kind=kind,
+                    kind=(
+                        ParameterKind.KEYWORD
+                        if param.kind is inspect.Parameter.KEYWORD_ONLY
+                        else ParameterKind.POSITIONAL
+                    ),
                 )
             )
 
-        return cls(parameters)
+        return cls(FixedSignature(parameters))
