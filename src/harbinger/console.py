@@ -15,6 +15,7 @@ class Style(IntEnum):
     YELLOW = 33
     CYAN = 36
     RED = 31
+    GREEN = 32
     DIM = 90
 
     @property
@@ -76,3 +77,7 @@ def stderr(s: str, /) -> None:
 
 def error(s: str, /) -> None:
     stderr(f"[red]error:[/] {s}")
+
+
+def hint(s: str, /) -> None:
+    stderr(f"[green]tip:[/] {s}")
