@@ -1,6 +1,7 @@
 import difflib
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TypeAlias
 
 
 class HarbingerError(Exception):
@@ -46,5 +47,61 @@ class TaskError(HarbingerError):
         super().__init__(f"task {name!r} failed")
 
 
-class TaskDefinitionError(HarbingerError):
-    pass
+class AlreadyTaskError(HarbingerError):
+    def __init__(self, func: str) -> None:
+        self.func_name = func
+        super().__init__(f"function {func!r} is already a task")
+
+
+class DuplicateTaskNameError(HarbingerError):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__(f"duplicate task name {name!r}")
+
+
+class VarKeywordError(HarbingerError):
+    def __init__(self, task: str, param: str) -> None:
+        self.task = task
+        self.param = param
+        super().__init__(f"task {task!r} cannot use **{param}")
+
+
+class MissingDefaultError(HarbingerError):
+    def __init__(self, task: str, param: str) -> None:
+        self.task = task
+        self.param = param
+        super().__init__(f"task {task!r} has parameter {param!r} without a default")
+
+
+class PositionalBoolError(HarbingerError):
+    def __init__(self, task: str, param: str) -> None:
+        self.task = task
+        self.param = param
+        super().__init__(f"task {task!r} has positional bool parameter {param!r}")
+
+
+class UnsupportedAnnotationError(HarbingerError):
+    def __init__(self, annotation: object, task: str, param: str) -> None:
+        self.annotation = annotation
+        self.task = task
+        self.param = param
+        super().__init__(
+            f"task {task!r} parameter {param!r}: unsupported annotation {annotation!r}"
+        )
+
+
+class MixedVariadicSignatureError(HarbingerError):
+    def __init__(self, task: str, param: str) -> None:
+        self.task = task
+        super().__init__(f"task {task!r} cannot mix *{param} with other parameters")
+
+
+TaskDefinitionError: TypeAlias = (
+    AlreadyTaskError
+    | DuplicateTaskNameError
+    | VarKeywordError
+    | MissingDefaultError
+    | PositionalBoolError
+    | UnsupportedAnnotationError
+    | MixedVariadicSignatureError
+)
