@@ -86,7 +86,7 @@ class TaskRegistry:
                     raise DuplicateTaskNameError(task.name)
                 store[task.name] = task
 
-        return cls(store=store)
+        return cls(store)
 
     def tasks(self) -> tuple[Task, ...]:
         return tuple(self.store.values())
