@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import Enum, auto
 from importlib.metadata import version
 from typing import Final, TypeAlias
 
@@ -12,19 +13,10 @@ from ..signature import FixedSignature, VariadicSignature
 TASKFILE: Final = "tasks.py"
 
 
-@dataclass(frozen=True, slots=True)
-class RunAll:
-    """harbinger --all"""
-
-
-@dataclass(frozen=True, slots=True)
-class RunDefault:
-    """harbinger --default"""
-
-
-@dataclass(frozen=True, slots=True)
-class ListTasks:
-    """harbinger --list"""
+class HarbingerFlag(Enum):
+    ALL = auto()
+    DEFAULT = auto()
+    LIST = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +34,7 @@ class Invoke:
     argv: tuple[str, ...]
 
 
-Command: TypeAlias = RunAll | RunDefault | ListTasks | RunSelected | Invoke
+Command: TypeAlias = HarbingerFlag | RunSelected | Invoke
 ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
 
 
@@ -159,13 +151,13 @@ def command(argv: Sequence[str]) -> Command:
     args = parser.parse_args(list(head))
 
     if args.all:
-        return RunAll()
+        return HarbingerFlag.ALL
 
     if args.default:
-        return RunDefault()
+        return HarbingerFlag.DEFAULT
 
     if args.list:
-        return ListTasks()
+        return HarbingerFlag.LIST
 
     if tail:
         tasks = args.tasks
@@ -179,4 +171,4 @@ def command(argv: Sequence[str]) -> Command:
     if args.tasks:
         return RunSelected(names=tuple(args.tasks))
 
-    return ListTasks()
+    return HarbingerFlag.LIST

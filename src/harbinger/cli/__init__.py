@@ -15,10 +15,8 @@ from . import console
 from .fmt import causes_of, diagnostic_for, run, show
 from .parser import (
     TASKFILE,
+    HarbingerFlag,
     Invoke,
-    ListTasks,
-    RunAll,
-    RunDefault,
     RunSelected,
     Subparser,
     command,
@@ -54,13 +52,13 @@ def main() -> int:
 
     try:
         match cmd:
-            case RunAll():
+            case HarbingerFlag.ALL:
                 run(registry.all())
 
-            case RunDefault():
+            case HarbingerFlag.DEFAULT:
                 run(registry.default())
 
-            case ListTasks():
+            case HarbingerFlag.LIST:
                 show(registry.all(), TASKFILE)
 
             case RunSelected(names=names):
