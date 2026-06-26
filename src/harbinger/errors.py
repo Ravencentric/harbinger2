@@ -49,7 +49,7 @@ class TaskError(HarbingerError):
 
 class AlreadyTaskError(HarbingerError):
     def __init__(self, func: str) -> None:
-        self.func_name = func
+        self.func = func
         super().__init__(f"function {func!r} is already a task")
 
 
