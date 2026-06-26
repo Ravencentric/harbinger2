@@ -6,7 +6,12 @@ from harbinger.errors import (
     VarKeywordError,
 )
 from harbinger.model import TaskFn
-from harbinger.signature import ParameterKind, Signature
+from harbinger.signature import (
+    FixedSignature,
+    ParameterKind,
+    Signature,
+    VariadicSignature,
+)
 
 
 def signature(fn: TaskFn[..., object]) -> Signature:
@@ -17,15 +22,17 @@ def test_no_params() -> None:
     def f() -> None: ...
 
     sig = signature(f)
-    assert len(sig.parameters) == 0
+    assert isinstance(sig.kind, FixedSignature)
+    assert len(sig.kind.parameters) == 0
 
 
 def test_positional_with_default() -> None:
     def f(a: int = 1) -> None: ...
 
     sig = signature(f)
-    assert len(sig.parameters) == 1
-    p = sig.parameters[0]
+    assert isinstance(sig.kind, FixedSignature)
+    assert len(sig.kind.parameters) == 1
+    p = sig.kind.parameters[0]
     assert p.name == "a"
     assert p.converter is int
     assert p.default == 1
@@ -35,33 +42,36 @@ def test_positional_with_default() -> None:
 def test_positional_only_collapses_to_positional() -> None:
     def f(a: int = 1, /) -> None: ...
 
-    p = signature(f).parameters[0]
-    assert p.kind is ParameterKind.POSITIONAL
+    sig = signature(f)
+    assert isinstance(sig.kind, FixedSignature)
+    assert sig.kind.parameters[0].kind is ParameterKind.POSITIONAL
 
 
 def test_keyword_only() -> None:
     def f(*, a: int = 1) -> None: ...
 
-    p = signature(f).parameters[0]
-    assert p.kind is ParameterKind.KEYWORD
+    sig = signature(f)
+    assert isinstance(sig.kind, FixedSignature)
+    assert sig.kind.parameters[0].kind is ParameterKind.KEYWORD
 
 
 def test_bool_annotation_is_keyword() -> None:
     def f(*, loud: bool = False) -> None: ...
 
-    p = signature(f).parameters[0]
-    assert p.converter is bool
-    assert p.kind is ParameterKind.KEYWORD
+    sig = signature(f)
+    assert isinstance(sig.kind, FixedSignature)
+    param = sig.kind.parameters[0]
+    assert param.converter is bool
+    assert param.kind is ParameterKind.KEYWORD
 
 
-def test_var_positional_accepted() -> None:
+def test_var_args() -> None:
     def f(*args: int) -> None: ...
 
-    p = signature(f).parameters[0]
-    assert p.name == "args"
-    assert p.converter is int
-    assert p.default == ()
-    assert p.kind is ParameterKind.VAR_POSITIONAL
+    sig = signature(f)
+    assert isinstance(sig.kind, VariadicSignature)
+    assert sig.kind.name == "args"
+    assert sig.kind.converter is int
 
 
 def test_var_keyword_rejected() -> None:

@@ -55,13 +55,13 @@ def main() -> int:
     try:
         match cmd:
             case RunAll():
-                run(registry.tasks())
+                run(registry.all())
 
             case RunDefault():
                 run(registry.default())
 
             case ListTasks():
-                show(registry.tasks(), TASKFILE)
+                show(registry.all(), TASKFILE)
 
             case RunSelected(names=names):
                 run(registry.select(names))
