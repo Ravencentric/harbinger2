@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Final, TypeAlias
 
 from ..model import Task
+from ..signature import FixedSignature, VariadicSignature
 
 TASKFILE: Final = "tasks.py"
 
@@ -42,6 +43,7 @@ class Invoke:
 
 
 Command: TypeAlias = RunAll | RunDefault | ListTasks | RunSelected | Invoke
+ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,57 +56,59 @@ class Subparser:
 
     task: Task
 
-    def parse(
-        self, argv: Sequence[str]
-    ) -> tuple[tuple[object, ...], dict[str, object]]:
+    def parse(self, argv: Sequence[str]) -> ArgsKwargs:
         parser = argparse.ArgumentParser(
             prog=f"harbinger {self.task.name} --",
             description=self.task.description,
         )
 
-        for param in self.task.signature.parameters:
-            if param.kind.is_keyword():
-                flag = f"--{param.name.replace('_', '-')}"
-                # ponytail: the one piece of presentation logic in the consumer.
-                # Signature stays presentation-agnostic; a future non-CLI
-                # consumer isn't forced into flag semantics.
-                if param.converter is bool:
-                    parser.add_argument(
-                        flag,
-                        action=argparse.BooleanOptionalAction,
-                        default=param.default,
-                        help=f"default: {param.default}",
-                    )
-                else:
-                    parser.add_argument(
-                        flag,
-                        type=param.converter,
-                        default=param.default,
-                        help=f"default: {param.default}",
-                    )
-            else:
-                parser.add_argument(
-                    param.name,
-                    type=param.converter,
-                    nargs="?",
-                    default=param.default,
-                    help=f"default: {param.default}",
-                )
+        match self.task.signature.kind:
+            case VariadicSignature(name=name, converter=converter):
+                parser.add_argument(name, nargs="*", type=converter)
+                ns = parser.parse_args()
+                return (ns.args, {})
 
-        ns = parser.parse_args(list(argv))
+            case FixedSignature(parameters=parameters):
+                for param in parameters:
+                    if param.kind.is_keyword():
+                        flag = f"--{param.name.replace('_', '-')}"
 
-        # Rebuild into ordered (args, kwargs) matching the original signature
-        positional: list[object] = []
-        keyword: dict[str, object] = {}
+                        if param.converter is bool:
+                            parser.add_argument(
+                                flag,
+                                action=argparse.BooleanOptionalAction,
+                                default=param.default,
+                                help=f"default: {param.default}",
+                            )
+                        else:
+                            parser.add_argument(
+                                flag,
+                                type=param.converter,
+                                default=param.default,
+                                help=f"default: {param.default}",
+                            )
+                    else:
+                        parser.add_argument(
+                            param.name,
+                            type=param.converter,
+                            nargs="?",
+                            default=param.default,
+                            help=f"default: {param.default}",
+                        )
 
-        for param in self.task.signature.parameters:
-            val = getattr(ns, param.name)
-            if param.kind.is_keyword():
-                keyword[param.name] = val
-            else:
-                positional.append(val)
+                ns = parser.parse_args(argv)
 
-        return tuple(positional), keyword
+                args: list[object] = []
+                kwargs: dict[str, object] = {}
+
+                for param in parameters:
+                    val = getattr(ns, param.name)
+                    if param.kind.is_keyword():
+                        kwargs[param.name] = val
+                    else:
+                        args.append(val)
+
+                return args, kwargs
 
 
 def parse(argv: Sequence[str]) -> Command:

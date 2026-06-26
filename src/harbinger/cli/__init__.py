@@ -3,16 +3,31 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from . import console
 from ..errors import (
+    AlreadyTaskError,
+    DuplicateTaskNameError,
     HarbingerError,
+    MissingDefaultError,
+    PositionalBoolError,
     TaskError,
     TaskFileNotFoundError,
     UndefinedTaskNameError,
+    UnsupportedAnnotationError,
+    VarKeywordError,
 )
 from ..registry import TaskRegistry
-from .parser import TASKFILE, Invoke, ListTasks, RunAll, RunDefault, RunSelected, Subparser, parse
-from .present import render_causes, run, show
+from . import console
+from .parser import (
+    TASKFILE,
+    Invoke,
+    ListTasks,
+    RunAll,
+    RunDefault,
+    RunSelected,
+    Subparser,
+    parse,
+)
+from .present import causes_of, diagnostic_for, run, show
 
 
 def main() -> int:
@@ -25,9 +40,23 @@ def main() -> int:
         console.stderr("")
         console.hint("create tasks.py here, or run harbinger from the project root")
         return 1
+    except (
+        AlreadyTaskError,
+        DuplicateTaskNameError,
+        VarKeywordError,
+        MissingDefaultError,
+        PositionalBoolError,
+        UnsupportedAnnotationError,
+    ) as error:
+        line, hint = diagnostic_for(error)
+        console.error(line)
+        if hint:
+            console.stderr("")
+            console.hint(hint)
+        return 1
     except HarbingerError as error:
         console.error(str(error))
-        causes = render_causes(error)
+        causes = causes_of(error)
         if causes:
             console.stderr(causes)
         return 1
@@ -68,13 +97,13 @@ def main() -> int:
         return 1
     except TaskError as error:
         console.error(f"task [cyan]{error.name!r}[/] failed")
-        causes = render_causes(error)
+        causes = causes_of(error)
         if causes:
             console.stderr(causes)
         return 1
     except HarbingerError as error:
         console.error(str(error))
-        causes = render_causes(error)
+        causes = causes_of(error)
         if causes:
             console.stderr(causes)
         return 1

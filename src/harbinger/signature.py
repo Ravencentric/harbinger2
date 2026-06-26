@@ -55,7 +55,7 @@ class VariadicSignature:
 @final
 @dataclass(frozen=True, slots=True)
 class Signature:
-    signature: FixedSignature | VariadicSignature
+    kind: FixedSignature | VariadicSignature
 
     @classmethod
     def parse(cls, func: TaskFn[..., object]) -> Self:

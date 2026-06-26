@@ -16,6 +16,7 @@ class Style(IntEnum):
     CYAN = 36
     RED = 31
     GREEN = 32
+    MAGENTA = 35
     DIM = 90
 
     @property
