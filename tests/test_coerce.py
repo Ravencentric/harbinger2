@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 
 from harbinger.coerce import converter_for, identity
-from harbinger.errors import TaskDefinitionError
 
 
 @pytest.mark.parametrize("annotation", [int, str, float, bool, Path])
@@ -21,5 +20,4 @@ def test_noop(annotation: object) -> None:
 
 @pytest.mark.parametrize("annotation", [bytes, datetime])
 def test_unsupported_rejected(annotation: object) -> None:
-    with pytest.raises(TaskDefinitionError):
-        converter_for(annotation)
+    assert converter_for(annotation) is None

@@ -1,6 +1,10 @@
 import pytest
 
-from harbinger.errors import TaskDefinitionError
+from harbinger.errors import (
+    MissingDefaultError,
+    PositionalBoolError,
+    VarKeywordError,
+)
 from harbinger.model import TaskFn
 from harbinger.signature import ParameterKind, Signature
 
@@ -50,29 +54,32 @@ def test_bool_annotation_is_keyword() -> None:
     assert p.kind is ParameterKind.KEYWORD
 
 
-def test_var_positional_rejected() -> None:
-    def f(*a: int) -> None: ...
+def test_var_positional_accepted() -> None:
+    def f(*args: int) -> None: ...
 
-    with pytest.raises(TaskDefinitionError):
-        signature(f)
+    p = signature(f).parameters[0]
+    assert p.name == "args"
+    assert p.converter is int
+    assert p.default == ()
+    assert p.kind is ParameterKind.VAR_POSITIONAL
 
 
 def test_var_keyword_rejected() -> None:
     def f(**k: int) -> None: ...
 
-    with pytest.raises(TaskDefinitionError):
+    with pytest.raises(VarKeywordError):
         signature(f)
 
 
 def test_missing_default_rejected() -> None:
     def f(a: int) -> None: ...
 
-    with pytest.raises(TaskDefinitionError):
+    with pytest.raises(MissingDefaultError):
         signature(f)
 
 
 def test_positional_bool_rejected() -> None:
     def f(loud: bool = False) -> None: ...
 
-    with pytest.raises(TaskDefinitionError):
+    with pytest.raises(PositionalBoolError):
         signature(f)
