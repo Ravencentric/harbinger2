@@ -10,6 +10,7 @@ from ..errors import (
     DuplicateTaskNameError,
     HarbingerError,
     MissingDefaultError,
+    MixedVariadicSignatureError,
     PositionalBoolError,
     TaskDefinitionError,
     UnsupportedAnnotationError,
@@ -86,15 +87,15 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
 def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
 
     match error:
-        case AlreadyTaskError(func=func):
+        case AlreadyTaskError(task=task):
             return (
-                f"function [yellow]{func!r}[/] is already a task",
+                f"function [yellow]{task!r}[/] is already a task",
                 "each function can only be decorated with [magenta]@task[/] once",
             )
 
-        case DuplicateTaskNameError(name=name):
+        case DuplicateTaskNameError(task=task):
             return (
-                f"duplicate task name [yellow]{name!r}[/]",
+                f"duplicate task name [yellow]{task!r}[/]",
                 "two functions resolved to the same name; use [magenta]@task(name=...)[/] to disambiguate",
             )
 
@@ -123,5 +124,13 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
                 + ",".join(f"[magenta]{type}[/]" for type in SUPPORTED),
             )
 
+        case MixedVariadicSignatureError(task=task, param=param):
+            return (
+                f"task [cyan]{task!r}[/] cannot mix [magenta]*{param}[/] with other parameters",
+                f"remove the other parameters or replace [magenta]*{param}[/] with explicit parameters",
+            )
+
         case _:
-            raise RuntimeError
+            raise AssertionError(
+                f"unhandled TaskDefinitionError: {type(error).__name__}: {error}"
+            )

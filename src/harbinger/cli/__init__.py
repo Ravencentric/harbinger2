@@ -4,19 +4,15 @@ import sys
 from pathlib import Path
 
 from ..errors import (
-    AlreadyTaskError,
-    DuplicateTaskNameError,
     HarbingerError,
-    MissingDefaultError,
-    PositionalBoolError,
+    TaskDefinitionError,
     TaskError,
     TaskFileNotFoundError,
     UndefinedTaskNameError,
-    UnsupportedAnnotationError,
-    VarKeywordError,
 )
 from ..registry import TaskRegistry
 from . import console
+from .fmt import causes_of, diagnostic_for, run, show
 from .parser import (
     TASKFILE,
     Invoke,
@@ -25,44 +21,39 @@ from .parser import (
     RunDefault,
     RunSelected,
     Subparser,
-    parse,
+    command,
 )
-from .present import causes_of, diagnostic_for, run, show
 
 
 def main() -> int:
-    command = parse(sys.argv[1:])
+    cmd = command(sys.argv[1:])
 
     try:
         registry = TaskRegistry.load(Path.cwd() / TASKFILE)
     except TaskFileNotFoundError as error:
-        console.error(str(error))
+        console.error(error.msg)
         console.stderr("")
-        console.hint("create tasks.py here, or run harbinger from the project root")
+        console.hint(
+            "create [cyan]tasks.py[/] here, or run harbinger from the project root"
+        )
         return 1
-    except (
-        AlreadyTaskError,
-        DuplicateTaskNameError,
-        VarKeywordError,
-        MissingDefaultError,
-        PositionalBoolError,
-        UnsupportedAnnotationError,
-    ) as error:
-        line, hint = diagnostic_for(error)
-        console.error(line)
-        if hint:
-            console.stderr("")
-            console.hint(hint)
+
+    except TaskDefinitionError as error:
+        err, hint = diagnostic_for(error)
+        console.error(err)
+        console.stderr("")
+        console.hint(hint)
         return 1
+
     except HarbingerError as error:
-        console.error(str(error))
+        console.error(error.msg)
         causes = causes_of(error)
         if causes:
             console.stderr(causes)
         return 1
 
     try:
-        match command:
+        match cmd:
             case RunAll():
                 run(registry.tasks())
 
@@ -70,7 +61,7 @@ def main() -> int:
                 run(registry.default())
 
             case ListTasks():
-                show(registry, TASKFILE)
+                show(registry.tasks(), TASKFILE)
 
             case RunSelected(names=names):
                 run(registry.select(names))
@@ -84,23 +75,29 @@ def main() -> int:
         label = "task" if len(error.names) == 1 else "tasks"
         names = ", ".join(f"[yellow]{n!r}[/]" for n in error.names)
         console.error(f"unknown {label} {names}")
+
         available = registry.names()
         hints = error.suggest(available)
+
         if hints:
             console.stderr("")
             suggested = ", ".join(f"[cyan]{h}[/]" for h in hints)
             console.hint(f"did you mean {suggested}?")
+
         elif available:
             console.stderr("")
             avail = ", ".join(f"[cyan]{a!r}[/]" for a in available)
             console.hint(f"available tasks: {avail}")
+
         return 1
+
     except TaskError as error:
         console.error(f"task [cyan]{error.name!r}[/] failed")
         causes = causes_of(error)
         if causes:
             console.stderr(causes)
         return 1
+
     except HarbingerError as error:
         console.error(str(error))
         causes = causes_of(error)

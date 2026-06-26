@@ -88,7 +88,7 @@ class TaskRegistry:
 
         return cls(store)
 
-    def tasks(self) -> tuple[Task, ...]:
+    def all(self) -> tuple[Task, ...]:
         return tuple(self.store.values())
 
     def default(self) -> tuple[Task, ...]:

@@ -67,9 +67,9 @@ class Signature:
             converter = converter_for(param.annotation)
             if converter is None:
                 raise UnsupportedAnnotationError(
-                    param.annotation,
                     task=name,
                     param=param.name,
+                    annotation=param.annotation,
                 )
 
             return cls(
@@ -100,9 +100,9 @@ class Signature:
             converter = converter_for(param.annotation)
             if converter is None:
                 raise UnsupportedAnnotationError(
-                    param.annotation,
                     task=name,
                     param=param.name,
+                    annotation=param.annotation,
                 )
 
             parameters.append(

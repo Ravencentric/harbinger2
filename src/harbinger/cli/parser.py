@@ -111,10 +111,10 @@ class Subparser:
                 return args, kwargs
 
 
-def parse(argv: Sequence[str]) -> Command:
+def command(argv: Sequence[str]) -> Command:
     has_dash = "--" in argv
     if has_dash:
-        pivot = list(argv).index("--")
+        pivot = argv.index("--")
         head, tail = argv[:pivot], argv[pivot + 1 :]
     else:
         head, tail = argv, ()

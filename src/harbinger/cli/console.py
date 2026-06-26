@@ -69,11 +69,15 @@ def render(s: str) -> str:
 
 
 def stdout(s: str, /) -> None:
-    print(render(s), file=sys.stdout)
+    if s:
+        s = render(s)
+    print(s, file=sys.stdout)
 
 
 def stderr(s: str, /) -> None:
-    print(render(s), file=sys.stderr)
+    if s:
+        s = render(s)
+    print(s, file=sys.stderr)
 
 
 def error(s: str, /) -> None:
