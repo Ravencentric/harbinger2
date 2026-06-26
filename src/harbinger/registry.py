@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final, overload
 
 from .errors import (
+    AlreadyTaskError,
+    DuplicateTaskNameError,
+    HarbingerError,
     InvalidTaskFileError,
-    TaskDefinitionError,
     TaskFileNotFoundError,
     UndefinedTaskNameError,
 )
@@ -45,7 +47,7 @@ def task(
 
     def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
         if getattr(fn, MARKER, None) is not None:
-            raise TaskDefinitionError(f"function {fn.__name__!r} is already a task")
+            raise AlreadyTaskError(fn.__name__)
         setattr(fn, MARKER, spec)
         return fn
 
@@ -69,7 +71,7 @@ class TaskRegistry:
 
         try:
             spec.loader.exec_module(module)
-        except TaskDefinitionError:
+        except HarbingerError:
             raise
 
         except Exception as source:
@@ -81,7 +83,7 @@ class TaskRegistry:
             if spec is not None:
                 task = Task.from_func(obj, spec)
                 if task.name in store:
-                    raise TaskDefinitionError(f"duplicate task name {task.name!r}")
+                    raise DuplicateTaskNameError(task.name)
                 store[task.name] = task
 
         return cls(store=store)
