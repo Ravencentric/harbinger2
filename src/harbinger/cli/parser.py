@@ -57,8 +57,8 @@ class Subparser:
         match self.task.signature.kind:
             case VariadicSignature(name=name, converter=converter):
                 parser.add_argument(name, nargs="*", type=converter)
-                ns = parser.parse_args()
-                return (ns.args, {})
+                ns = parser.parse_args(argv)
+                return (getattr(ns, name), {})
 
             case FixedSignature(parameters=parameters):
                 for param in parameters:

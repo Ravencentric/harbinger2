@@ -46,12 +46,14 @@ Function names are converted from `snake_case` to `kebab-case`. A function named
 
 ```
 harbinger              # list available tasks
-harbinger --list       # same as above
-harbinger --default    # run default tasks only
-harbinger --all        # run all tasks
-harbinger --version    # print version
+harbinger -l/--list   # same as above
+harbinger -d/--default # run default tasks only
+harbinger -a/--all    # run all tasks
+harbinger -V/--version # print version
 harbinger hello        # run one or more tasks by name
 ```
+
+`python -m harbinger` also works.
 
 Tasks are included in `--default` by default. Mark composite/aggregator tasks with `default=False`:
 
@@ -92,7 +94,25 @@ Every task parameter **must have a default value**. Supported annotations:
 | `bool`  | Must be keyword-only (use `*, flag: bool = False`) |
 | `Path`  | From `pathlib`                                     |
 
-Unannotated parameters are treated as `str`. `bool` parameters expose `--flag` / `--no-flag`. `*args` and `**kwargs` are not supported.
+Unannotated parameters are treated as `str`. `bool` parameters expose `--flag` / `--no-flag`.
+
+### Variadic tasks
+
+A task may accept a single `*args` parameter (typed or untyped) to collect an arbitrary number of positional values:
+
+```python
+@task
+def files(*paths: Path) -> None:
+    """Process one or more paths."""
+    for p in paths:
+        print(p)
+```
+
+```
+harbinger files -- a.txt b.txt c.txt
+```
+
+A variadic parameter cannot be mixed with other parameters, and `**kwargs` is not supported.
 
 ## Errors
 

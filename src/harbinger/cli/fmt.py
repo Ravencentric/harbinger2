@@ -60,11 +60,12 @@ def causes_of(error: HarbingerError) -> str:
 
 
 def run(tasks: Sequence[Task], /) -> None:
-    for task in tasks:
+    for i, task in enumerate(tasks):
         if len(tasks) > 1:
             console.stdout(f"[yellow]$[/] [cyan]{task.name}[/]")
         task.call()
-        console.stdout("")
+        if len(tasks) > 1 and i < len(tasks) - 1:
+            console.stdout("")
 
 
 def show(tasks: Sequence[Task], taskfile: str, /) -> None:
@@ -118,10 +119,13 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
             )
 
         case UnsupportedAnnotationError(annotation=ann, task=task, param=param):
+            supported = ", ".join(
+                f"[magenta]{t.__name__}[/]"
+                for t in sorted(SUPPORTED, key=lambda t: t.__name__)
+            )
             return (
                 f"task [cyan]{task!r}[/] parameter [magenta]{param!r}[/]: unsupported annotation [magenta]{ann!r}[/]",
-                "supported types: "
-                + ",".join(f"[magenta]{type}[/]" for type in SUPPORTED),
+                f"supported types: {supported}",
             )
 
         case MixedVariadicSignatureError(task=task, param=param):

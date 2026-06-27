@@ -34,7 +34,7 @@ def main() -> int:
         console.hint(
             "create [cyan]tasks.py[/] here, or run harbinger from the project root"
         )
-        return 1
+        return 2
 
     except TaskDefinitionError as error:
         err, hint = diagnostic_for(error)
@@ -87,7 +87,7 @@ def main() -> int:
             avail = ", ".join(f"[cyan]{a!r}[/]" for a in available)
             console.hint(f"available tasks: {avail}")
 
-        return 1
+        return 2
 
     except TaskError as error:
         console.error(f"task [cyan]{error.name!r}[/] failed")
