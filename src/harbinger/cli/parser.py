@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from importlib.metadata import version
 from typing import Final, TypeAlias
 
+from ..annotation import EmptyType, LiteralType, ScalarType
 from ..model import Task
 from ..signature import FixedSignature, VariadicSignature
 
@@ -55,52 +57,83 @@ class Subparser:
         )
 
         match self.task.signature.kind:
-            case VariadicSignature(name=name, converter=converter):
-                parser.add_argument(name, nargs="*", type=converter)
+            case VariadicSignature(name, type):
+                match type:
+                    case ScalarType(scalar):
+                        parser.add_argument(name, nargs="*", type=scalar)
+                    case EmptyType():
+                        parser.add_argument(name, nargs="*")
                 ns = parser.parse_args(argv)
                 return (getattr(ns, name), {})
 
             case FixedSignature(parameters=parameters):
                 for param in parameters:
                     if param.kind.is_keyword():
-                        flag = f"--{param.name.replace('_', '-')}"
+                        flag = f"--{param.name}"
 
-                        if param.converter is bool:
-                            parser.add_argument(
-                                flag,
-                                action=argparse.BooleanOptionalAction,
-                                default=param.default,
-                                help=f"default: {param.default}",
-                            )
-                        else:
-                            parser.add_argument(
-                                flag,
-                                type=param.converter,
-                                default=param.default,
-                                help=f"default: {param.default}",
-                            )
+                        def arg(**kwargs: object) -> None:
+                            if default := param.default:
+                                parser.add_argument(
+                                    flag,
+                                    default=default,
+                                    help=f"default: {default}",
+                                    **kwargs,
+                                )
+                            else:
+                                parser.add_argument(flag, **kwargs)
+
+                        match param.type:
+                            case EmptyType():
+                                arg()
+
+                            case ScalarType(builtins.bool):
+                                arg(action=argparse.BooleanOptionalAction)
+
+                            case ScalarType(type):
+                                arg(type=type)
+
+                            case LiteralType(choices):
+                                arg(choices=choices)
+
                     else:
-                        parser.add_argument(
-                            param.name,
-                            type=param.converter,
-                            nargs="?",
-                            default=param.default,
-                            help=f"default: {param.default}",
-                        )
+                        match param.type:
+                            case EmptyType():
+                                parser.add_argument(
+                                    param.name,
+                                    nargs="?",
+                                    **kw,
+                                )
+
+                            case ScalarType(type=scalar):
+                                parser.add_argument(
+                                    param.name,
+                                    type=scalar,
+                                    nargs="?",
+                                    **kw,
+                                )
+
+                            case LiteralType(values=values):
+                                parser.add_argument(
+                                    param.name,
+                                    type=str,
+                                    choices=values,
+                                    nargs="?",
+                                    **kw,
+                                )
 
                 ns = parser.parse_args(argv)
 
-                args: list[object] = []
-                kwargs: dict[str, object] = {}
+                pos: list[object] = []
+                kw: dict[str, object] = {}
 
                 for param in parameters:
                     val = getattr(ns, param.name)
                     if param.kind.is_keyword():
-                        kwargs[param.name] = val
+                        kw[param.name] = val
                     else:
-                        args.append(val)
+                        pos.append(val)
 
-                return args, kwargs
+                return pos, kw
 
 
 def command(argv: Sequence[str]) -> Command:

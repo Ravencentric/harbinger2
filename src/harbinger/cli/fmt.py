@@ -4,7 +4,7 @@ import os
 import traceback
 from collections.abc import Sequence
 
-from ..coerce import SUPPORTED
+from .. import annotation
 from ..errors import (
     AlreadyTaskError,
     DuplicateTaskNameError,
@@ -120,8 +120,7 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
 
         case UnsupportedAnnotationError(annotation=ann, task=task, param=param):
             supported = ", ".join(
-                f"[magenta]{t.__name__}[/]"
-                for t in sorted(SUPPORTED, key=lambda t: t.__name__)
+                f"[magenta]{type.__name__}[/]" for type in annotation.SCALARS
             )
             return (
                 f"task [cyan]{task!r}[/] parameter [magenta]{param!r}[/]: unsupported annotation [magenta]{ann!r}[/]",

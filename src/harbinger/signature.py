@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import TYPE_CHECKING, Self, Sequence, final
 
-from .coerce import converter_for
+from . import annotation
+from .annotation import EmptyType, ScalarType, TypeSpec
 from .errors import (
     MissingDefaultError,
     MixedVariadicSignatureError,
@@ -34,8 +34,8 @@ class ParameterKind(IntEnum):
 @dataclass(frozen=True, slots=True)
 class Parameter:
     name: str
-    converter: Callable[[str], object]
-    default: object
+    type: TypeSpec
+    default: object | None
     kind: ParameterKind
 
 
@@ -49,7 +49,7 @@ class FixedSignature:
 @dataclass(frozen=True, slots=True)
 class VariadicSignature:
     name: str
-    converter: Callable[[str], object]
+    type: ScalarType | EmptyType
 
 
 @final
@@ -64,20 +64,20 @@ class Signature:
 
         if len(params) == 1 and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
             param = params[0]
-            converter = converter_for(param.annotation)
-            if converter is None:
+            type = annotation.parse(param.annotation)
+            if isinstance(type, (ScalarType, EmptyType)):
+                return cls(
+                    VariadicSignature(
+                        name=param.name,
+                        type=type,
+                    )
+                )
+            else:
                 raise UnsupportedAnnotationError(
                     task=name,
                     param=param.name,
                     annotation=param.annotation,
                 )
-
-            return cls(
-                VariadicSignature(
-                    name=param.name,
-                    converter=converter,
-                )
-            )
 
         parameters: list[Parameter] = []
 
@@ -97,8 +97,8 @@ class Signature:
             ):
                 raise PositionalBoolError(name, param.name)
 
-            converter = converter_for(param.annotation)
-            if converter is None:
+            type = annotation.parse(param.annotation)
+            if type is None:
                 raise UnsupportedAnnotationError(
                     task=name,
                     param=param.name,
@@ -108,8 +108,12 @@ class Signature:
             parameters.append(
                 Parameter(
                     name=param.name,
-                    converter=converter,
-                    default=param.default,
+                    type=type,
+                    default=(
+                        None
+                        if param.default is inspect.Parameter.empty
+                        else param.default
+                    ),
                     kind=(
                         ParameterKind.KEYWORD
                         if param.kind is inspect.Parameter.KEYWORD_ONLY
