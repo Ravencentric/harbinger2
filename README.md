@@ -112,7 +112,7 @@ def files(*paths: Path) -> None:
 harbinger files -- a.txt b.txt c.txt
 ```
 
-A variadic parameter cannot be mixed with other parameters, and `**kwargs` is not supported.
+A variadic parameter cannot be mixed with other parameters, and `**kwargs` is not supported. Both bans are deliberately broad: mixing `*args` with a positional makes the positional's default unreachable (argparse fills `nargs="?"` from the left), and `**kwargs` has no clean declarative mapping onto argparse. The keyword-only case (`*args` plus `--flag` options) is unambiguous and may be lifted if the need arises.
 
 ## Errors
 

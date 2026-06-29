@@ -1,5 +1,6 @@
 import pytest
 
+from harbinger.annotation import ScalarType
 from harbinger.errors import (
     MissingDefaultError,
     PositionalBoolError,
@@ -34,7 +35,7 @@ def test_positional_with_default() -> None:
     assert len(sig.kind.parameters) == 1
     p = sig.kind.parameters[0]
     assert p.name == "a"
-    assert p.converter is int
+    assert p.type == ScalarType(int)
     assert p.default == 1
     assert p.kind is ParameterKind.POSITIONAL
 
@@ -61,7 +62,7 @@ def test_bool_annotation_is_keyword() -> None:
     sig = signature(f)
     assert isinstance(sig.kind, FixedSignature)
     param = sig.kind.parameters[0]
-    assert param.converter is bool
+    assert param.type == ScalarType(bool)
     assert param.kind is ParameterKind.KEYWORD
 
 
@@ -71,7 +72,7 @@ def test_var_args() -> None:
     sig = signature(f)
     assert isinstance(sig.kind, VariadicSignature)
     assert sig.kind.name == "args"
-    assert sig.kind.converter is int
+    assert sig.kind.type == ScalarType(int)
 
 
 def test_var_keyword_rejected() -> None:
