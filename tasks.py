@@ -1,4 +1,5 @@
 import subprocess
+from typing import Literal
 
 from harbinger import task
 
@@ -35,6 +36,26 @@ def typecheck() -> None:
 def test() -> None:
     """Run the test suite."""
     uvrun("pytest")
+
+
+@task
+def greet(
+    who: str = "world",
+    *,
+    punctuation: Literal[".", "!"] = "!",
+    loud: bool = False,
+    times: int = 1,
+) -> None:
+    """Print a greeting a number of times."""
+    for _ in range(times):
+        msg = f"hello, {who}{punctuation}"
+        print(msg.upper() if loud else msg)
+
+
+@task
+def echo(*args: str) -> None:
+    """Echo each positional argument on its own line."""
+    print(sum(args))
 
 
 @task(default=False)

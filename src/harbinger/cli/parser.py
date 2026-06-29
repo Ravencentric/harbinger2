@@ -10,7 +10,7 @@ from typing import Final, TypeAlias
 
 from ..annotation import EmptyType, LiteralType, ScalarType
 from ..model import Task
-from ..signature import FixedSignature, VariadicSignature
+from ..signature import FixedSignature, Parameter, VariadicSignature
 
 TASKFILE: Final = "tasks.py"
 
@@ -39,101 +39,108 @@ class Invoke:
 Command: TypeAlias = HarbingerFlag | RunSelected | Invoke
 ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
 
-
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Subparser:
-    """Builds an argparse.ArgumentParser from a task's function signature.
-
-    Assumes every annotation is concrete and callable: ``anno(val)`` must work.
-    ``bool`` uses ``BooleanOptionalAction`` (``--flag`` / ``--no-flag``).
-    """
-
     task: Task
+    parser: argparse.ArgumentParser
 
-    def parse(self, argv: Sequence[str]) -> ArgsKwargs:
-        parser = argparse.ArgumentParser(
-            prog=f"harbinger {self.task.name} --",
-            description=self.task.description,
+    def __init__(self, task: Task, /) -> None:
+        self.task = task
+        self.parser = argparse.ArgumentParser(
+            prog=f"harbinger {task.name} --",
+            description=task.description,
         )
 
+    def parse(self, argv: Sequence[str]) -> ArgsKwargs:
         match self.task.signature.kind:
             case VariadicSignature(name, type):
                 match type:
                     case ScalarType(scalar):
-                        parser.add_argument(name, nargs="*", type=scalar)
+                        self.parser.add_argument(name, nargs="*", type=scalar)
                     case EmptyType():
-                        parser.add_argument(name, nargs="*")
-                ns = parser.parse_args(argv)
+                        self.parser.add_argument(name, nargs="*")
+                ns = self.parser.parse_args(argv)
                 return (getattr(ns, name), {})
 
             case FixedSignature(parameters=parameters):
                 for param in parameters:
                     if param.kind.is_keyword():
-                        flag = f"--{param.name}"
-
-                        def arg(**kwargs: object) -> None:
-                            if default := param.default:
-                                parser.add_argument(
-                                    flag,
-                                    default=default,
-                                    help=f"default: {default}",
-                                    **kwargs,
-                                )
-                            else:
-                                parser.add_argument(flag, **kwargs)
-
-                        match param.type:
-                            case EmptyType():
-                                arg()
-
-                            case ScalarType(builtins.bool):
-                                arg(action=argparse.BooleanOptionalAction)
-
-                            case ScalarType(type):
-                                arg(type=type)
-
-                            case LiteralType(choices):
-                                arg(choices=choices)
-
+                        self.add_kwarg(param)
                     else:
-                        match param.type:
-                            case EmptyType():
-                                parser.add_argument(
-                                    param.name,
-                                    nargs="?",
-                                    **kw,
-                                )
-
-                            case ScalarType(type=scalar):
-                                parser.add_argument(
-                                    param.name,
-                                    type=scalar,
-                                    nargs="?",
-                                    **kw,
-                                )
-
-                            case LiteralType(values=values):
-                                parser.add_argument(
-                                    param.name,
-                                    type=str,
-                                    choices=values,
-                                    nargs="?",
-                                    **kw,
-                                )
-
-                ns = parser.parse_args(argv)
-
-                pos: list[object] = []
-                kw: dict[str, object] = {}
-
+                        self.add_arg(param)
+                ns = self.parser.parse_args(argv)
+                args: list[object] = []
+                kwargs: dict[str, object] = {}
                 for param in parameters:
                     val = getattr(ns, param.name)
                     if param.kind.is_keyword():
-                        kw[param.name] = val
+                        kwargs[param.name] = val
                     else:
-                        pos.append(val)
+                        args.append(val)
+                return args, kwargs
 
-                return pos, kw
+    def add_kwarg(self, param: Parameter) -> None:
+        flag = f"--{param.name}"
+        match param.type:
+            case EmptyType():
+                self.parser.add_argument(
+                    flag,
+                    default=param.default,
+                    help=f"default: {param.default}",
+                )
+            case ScalarType(builtins.bool):
+                self.parser.add_argument(
+                    flag,
+                    action=argparse.BooleanOptionalAction,
+                    default=param.default,
+                    help=f"default: {param.default}",
+                )
+            case ScalarType(type):
+                self.parser.add_argument(
+                    flag,
+                    type=type,
+                    default=param.default,
+                    help=f"default: {param.default}",
+                )
+            case LiteralType(values):
+                self.parser.add_argument(
+                    flag,
+                    choices=values,
+                    default=param.default,
+                    # The default metavar for choices doesn't do spaces after comma
+                    # so we have to intervene.
+                    metavar=f"{{{', '.join(values)}}}",
+                    help=f"default: {param.default}",
+                )
+
+    def add_arg(self, param: Parameter) -> None:
+        match param.type:
+            case EmptyType():
+                self.parser.add_argument(
+                    param.name,
+                    nargs="?",
+                    default=param.default,
+                    help=f"default: {param.default}",
+                )
+            case ScalarType(type):
+                self.parser.add_argument(
+                    param.name,
+                    type=type,
+                    nargs="?",
+                    default=param.default,
+                    help=f"default: {param.default}",
+                )
+            case LiteralType(values):
+                self.parser.add_argument(
+                    param.name,
+                    choices=values,
+                    nargs="?",
+                    default=param.default,
+                    # The default metavar for choices doesn't do spaces after comma
+                    # so we have to intervene.
+                    metavar=f"{{{', '.join(values)}}}",
+                    help=f"default: {param.default}",
+                )
 
 
 def command(argv: Sequence[str]) -> Command:
@@ -181,7 +188,7 @@ def command(argv: Sequence[str]) -> Command:
         help="tasks to run; lists tasks when omitted",
     )
 
-    args = parser.parse_args(list(head))
+    args = parser.parse_args(head)
 
     if args.all:
         return HarbingerFlag.ALL
@@ -193,13 +200,13 @@ def command(argv: Sequence[str]) -> Command:
         return HarbingerFlag.LIST
 
     if tail:
-        tasks = args.tasks
-        if len(tasks) != 1:
-            parser.error("exactly one task must precede '--'")
-        return Invoke(name=tasks[0], argv=tuple(tail))
-
-    if has_dash and not args.tasks:
-        parser.error("no task specified before '--'")
+        match args.tasks:
+            case [name]:
+                return Invoke(name=name, argv=tail)
+            case []:
+                parser.error("no task specified before '--'")
+            case _:
+                parser.error("exactly one task must precede '--'")
 
     if args.tasks:
         return RunSelected(names=tuple(args.tasks))

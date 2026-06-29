@@ -35,7 +35,7 @@ class ParameterKind(IntEnum):
 class Parameter:
     name: str
     type: TypeSpec
-    default: object | None
+    default: object
     kind: ParameterKind
 
 

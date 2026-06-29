@@ -51,7 +51,7 @@ def causes_of(error: HarbingerError) -> str:
 
     for i, cause in enumerate(causes):
         message = f": {cause}" if str(cause) else ""
-        lines.append(f"    [yellow]{i}:[/] [magenta]{type(cause).__name__}[/]{message}")
+        lines.append(f"    {i}: [magenta]{type(cause).__name__}[/]{message}")
 
         if where := location_of(cause):
             lines.append(f"       {where}")
