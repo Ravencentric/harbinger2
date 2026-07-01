@@ -6,7 +6,13 @@ from typing import Any, Literal
 
 import pytest
 
-from harbinger.annotation import EmptyType, LiteralType, ScalarType, parse
+from harbinger.annotation import (
+    IntLiteralType,
+    ScalarType,
+    StringLiteralType,
+    Untyped,
+    parse,
+)
 
 
 @pytest.mark.parametrize(
@@ -18,7 +24,7 @@ from harbinger.annotation import EmptyType, LiteralType, ScalarType, parse
     ],
 )
 def test_parse_empty(annotation: object) -> None:
-    assert parse(annotation) == EmptyType()
+    assert parse(annotation) == Untyped()
 
 
 @pytest.mark.parametrize(
@@ -39,22 +45,26 @@ def test_parse_scalar(
 
 
 def test_parse_string_literal() -> None:
-    assert parse(Literal["foo", "bar"]) == LiteralType(
+    assert parse(Literal["foo", "bar"]) == StringLiteralType(
         ("foo", "bar"),
     )
 
 
 def test_parse_singleton_string_literal() -> None:
-    assert parse(Literal["foo"]) == LiteralType(
+    assert parse(Literal["foo"]) == StringLiteralType(
         ("foo",),
+    )
+
+
+def test_parse_int_literal() -> None:
+    assert parse(Literal[1, 2, 3]) == IntLiteralType(
+        (1, 2, 3),
     )
 
 
 @pytest.mark.parametrize(
     "annotation",
     [
-        Literal[1],
-        Literal[1, 2],
         Literal[1, "foo"],
         Literal[True],
         Literal[Path("a")],

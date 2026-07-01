@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import inspect
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, TypeAlias, final
+from typing import Any, ClassVar, Final, TypeAlias, final
 
 Scalar: TypeAlias = int | float | str | bool | Path
 SCALARS: Final[tuple[type[Scalar], ...]] = typing.get_args(Scalar)
@@ -11,7 +13,7 @@ UNANNOTATED: Final[tuple[object, ...]] = (inspect.Parameter.empty, object, Any)
 
 @final
 @dataclass(frozen=True, slots=True)
-class EmptyType:
+class Untyped:
     pass
 
 
@@ -23,24 +25,34 @@ class ScalarType:
 
 @final
 @dataclass(frozen=True, slots=True)
-class LiteralType:
+class StringLiteralType:
+    type: ClassVar[type[str]] = str
     values: tuple[str, ...]
 
 
-TypeSpec: TypeAlias = ScalarType | LiteralType | EmptyType
+@final
+@dataclass(frozen=True, slots=True)
+class IntLiteralType:
+    type: ClassVar[type[int]] = int
+    values: tuple[int, ...]
+
+
+TypeSpec: TypeAlias = ScalarType | StringLiteralType | IntLiteralType | Untyped
 
 
 def parse(annotation: object) -> TypeSpec | None:
     if annotation in UNANNOTATED:
-        return EmptyType()
+        return Untyped()
     if annotation in SCALARS:
         # Type checkers apparently cannot narrow this down
         # because it's unsafe to do for reasons unknown to me.
-        return ScalarType(annotation) # pyrefly: ignore[bad-argument-type]
+        return ScalarType(annotation)  # pyrefly: ignore[bad-argument-type]
 
     if typing.get_origin(annotation) is typing.Literal:
         args = typing.get_args(annotation)
         if all(arg.__class__ is str for arg in args):
-            return LiteralType(args)
+            return StringLiteralType(args)
+        if all(arg.__class__ is int for arg in args):
+            return IntLiteralType(args)
 
     return None

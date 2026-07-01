@@ -31,7 +31,7 @@ def task(
     *,
     name: str | None = None,
     description: str | None = None,
-    default: bool = True,
+    default: bool = False,
 ) -> TaskDecorator[P, R]: ...
 
 
@@ -41,7 +41,7 @@ def task(
     *,
     name: str | None = None,
     description: str | None = None,
-    default: bool = True,
+    default: bool = False,
 ) -> TaskFn[P, R] | TaskDecorator[P, R]:
     spec = TaskSpec(name=name, description=description, default=default)
 

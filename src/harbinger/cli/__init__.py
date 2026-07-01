@@ -87,6 +87,22 @@ def main() -> int:
             avail = ", ".join(f"[cyan]{a!r}[/]" for a in available)
             console.hint(f"available tasks: {avail}")
 
+        # Assuming someone tried running "harbinger greet Alice"
+        # where we can tell that that the first one is a real task, but the latter aren't
+        # it's possible that the user meant to pass args to the first task but forgot the
+        # seperator "--"
+        # We can provide a nice hint here
+        if (
+            len(error.names) >= 2  # Atleast two names: greet Alice
+            and error.names[0] in available  # greet is a Task
+            and error.names[1] not in available  # Alice is not a Task
+        ):
+            console.stderr("")
+            console.hint(
+                "to pass arguments to a task, use '--': "
+                "[cyan]harbinger <task> -- <args>[/]"
+            )
+
         return 2
 
     except TaskError as error:

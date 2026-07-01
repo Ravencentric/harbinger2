@@ -6,73 +6,87 @@ from harbinger.errors import (
     PositionalBoolError,
     VarKeywordError,
 )
-from harbinger.model import TaskFn
 from harbinger.signature import (
     FixedSignature,
-    ParameterKind,
-    Signature,
     VariadicSignature,
+    signature,
 )
-
-
-def signature(fn: TaskFn[..., object]) -> Signature:
-    return Signature.parse(fn)
 
 
 def test_no_params() -> None:
     def f() -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, FixedSignature)
-    assert len(sig.kind.parameters) == 0
+    assert isinstance(sig, FixedSignature)
+    assert len(sig.parameters) == 0
 
 
 def test_positional_with_default() -> None:
     def f(a: int = 1) -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, FixedSignature)
-    assert len(sig.kind.parameters) == 1
-    p = sig.kind.parameters[0]
+    assert isinstance(sig, FixedSignature)
+    assert len(sig.parameters) == 1
+    p = sig.parameters[0]
     assert p.name == "a"
     assert p.type == ScalarType(int)
     assert p.default == 1
-    assert p.kind is ParameterKind.POSITIONAL
+    assert p.is_keyword is False
 
 
 def test_positional_only_collapses_to_positional() -> None:
     def f(a: int = 1, /) -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, FixedSignature)
-    assert sig.kind.parameters[0].kind is ParameterKind.POSITIONAL
+    assert isinstance(sig, FixedSignature)
+    assert sig.parameters[0].is_keyword is False
 
 
 def test_keyword_only() -> None:
     def f(*, a: int = 1) -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, FixedSignature)
-    assert sig.kind.parameters[0].kind is ParameterKind.KEYWORD
+    assert isinstance(sig, FixedSignature)
+    assert sig.parameters[0].is_keyword is True
 
 
 def test_bool_annotation_is_keyword() -> None:
     def f(*, loud: bool = False) -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, FixedSignature)
-    param = sig.kind.parameters[0]
+    assert isinstance(sig, FixedSignature)
+    param = sig.parameters[0]
     assert param.type == ScalarType(bool)
-    assert param.kind is ParameterKind.KEYWORD
+    assert param.is_keyword is True
 
 
 def test_var_args() -> None:
     def f(*args: int) -> None: ...
 
     sig = signature(f)
-    assert isinstance(sig.kind, VariadicSignature)
-    assert sig.kind.name == "args"
-    assert sig.kind.type == ScalarType(int)
+    assert isinstance(sig, VariadicSignature)
+    assert sig.name == "args"
+    assert sig.type == ScalarType(int)
+    assert len(sig.kwargs) == 0
+
+
+def test_var_args_with_keywords() -> None:
+    def f(*args: str, flag: int = 0, loud: bool = False) -> None: ...
+
+    sig = signature(f)
+    assert isinstance(sig, VariadicSignature)
+    assert sig.name == "args"
+    assert sig.type == ScalarType(str)
+    assert len(sig.kwargs) == 2
+    flag, loud = sig.kwargs
+    assert flag.name == "flag"
+    assert flag.type == ScalarType(int)
+    assert flag.default == 0
+    assert flag.is_keyword is True
+    assert loud.name == "loud"
+    assert loud.type == ScalarType(bool)
+    assert loud.default is False
+    assert loud.is_keyword is True
 
 
 def test_var_keyword_rejected() -> None:

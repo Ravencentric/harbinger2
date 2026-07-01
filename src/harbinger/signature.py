@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from enum import IntEnum
-from typing import TYPE_CHECKING, Self, Sequence, final
+from typing import TYPE_CHECKING, Sequence, final
 
 from . import annotation
-from .annotation import EmptyType, ScalarType, TypeSpec
+from .annotation import Scalar, ScalarType, TypeSpec, Untyped
 from .errors import (
     MissingDefaultError,
     MixedVariadicSignatureError,
@@ -19,24 +18,13 @@ if TYPE_CHECKING:
     from .model import TaskFn
 
 
-class ParameterKind(IntEnum):
-    POSITIONAL = 0
-    KEYWORD = 1
-
-    def is_positional(self) -> bool:
-        return self is ParameterKind.POSITIONAL
-
-    def is_keyword(self) -> bool:
-        return self is ParameterKind.KEYWORD
-
-
 @final
 @dataclass(frozen=True, slots=True)
 class Parameter:
     name: str
     type: TypeSpec
-    default: object
-    kind: ParameterKind
+    default: Scalar | None
+    is_keyword: bool
 
 
 @final
@@ -49,77 +37,81 @@ class FixedSignature:
 @dataclass(frozen=True, slots=True)
 class VariadicSignature:
     name: str
-    type: ScalarType | EmptyType
+    type: ScalarType | Untyped
+    kwargs: Sequence[Parameter] = ()
 
 
-@final
-@dataclass(frozen=True, slots=True)
-class Signature:
-    kind: FixedSignature | VariadicSignature
+def typespec(name: str, param: inspect.Parameter) -> TypeSpec:
+    type = annotation.parse(param.annotation)
+    if type is None:
+        raise UnsupportedAnnotationError(
+            task=name,
+            param=param.name,
+            annotation=param.annotation,
+        )
+    return type
 
-    @classmethod
-    def parse(cls, func: TaskFn[..., object]) -> Self:
-        name = func.__name__
-        params = tuple(inspect.signature(func).parameters.values())
 
-        if len(params) == 1 and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
-            param = params[0]
-            type = annotation.parse(param.annotation)
-            if isinstance(type, (ScalarType, EmptyType)):
-                return cls(
-                    VariadicSignature(
-                        name=param.name,
-                        type=type,
-                    )
-                )
-            else:
-                raise UnsupportedAnnotationError(
-                    task=name,
-                    param=param.name,
-                    annotation=param.annotation,
-                )
+def variadic(name: str, params: Sequence[inspect.Parameter]) -> VariadicSignature:
+    posparam, *kwparams = params
 
-        parameters: list[Parameter] = []
+    postype = annotation.parse(posparam.annotation)
+    if not isinstance(postype, (ScalarType, Untyped)):
+        raise UnsupportedAnnotationError(
+            task=name,
+            param=posparam.name,
+            annotation=posparam.annotation,
+        )
 
-        for param in params:
-            if param.kind is inspect.Parameter.VAR_KEYWORD:
-                raise VarKeywordError(name, param.name)
+    kwargs: list[Parameter] = []
+    for param in kwparams:
+        if param.default is inspect.Parameter.empty:
+            raise MissingDefaultError(name, param.name)
 
-            if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                raise MixedVariadicSignatureError(name, param.name)
-
-            if param.default is inspect.Parameter.empty:
-                raise MissingDefaultError(name, param.name)
-
-            if (
-                param.annotation is bool
-                and param.kind is not inspect.Parameter.KEYWORD_ONLY
-            ):
-                raise PositionalBoolError(name, param.name)
-
-            type = annotation.parse(param.annotation)
-            if type is None:
-                raise UnsupportedAnnotationError(
-                    task=name,
-                    param=param.name,
-                    annotation=param.annotation,
-                )
-
-            parameters.append(
-                Parameter(
-                    name=param.name,
-                    type=type,
-                    default=(
-                        None
-                        if param.default is inspect.Parameter.empty
-                        else param.default
-                    ),
-                    kind=(
-                        ParameterKind.KEYWORD
-                        if param.kind is inspect.Parameter.KEYWORD_ONLY
-                        else ParameterKind.POSITIONAL
-                    ),
-                )
+        kwargs.append(
+            Parameter(
+                name=param.name,
+                type=typespec(name, param),
+                default=param.default,
+                is_keyword=True,
             )
+        )
 
-        return cls(FixedSignature(parameters))
+    return VariadicSignature(name=posparam.name, type=postype, kwargs=kwargs)
+
+
+def fixed(name: str, params: Sequence[inspect.Parameter]) -> FixedSignature:
+    parameters: list[Parameter] = []
+    for param in params:
+        if param.kind is inspect.Parameter.VAR_KEYWORD:
+            raise VarKeywordError(name, param.name)
+
+        if param.kind is inspect.Parameter.VAR_POSITIONAL:
+            raise MixedVariadicSignatureError(name, param.name)
+
+        if param.default is inspect.Parameter.empty:
+            raise MissingDefaultError(name, param.name)
+
+        if (
+            param.annotation is bool
+            and param.kind is not inspect.Parameter.KEYWORD_ONLY
+        ):
+            raise PositionalBoolError(name, param.name)
+
+        parameters.append(
+            Parameter(
+                name=param.name,
+                type=typespec(name, param),
+                default=param.default,
+                is_keyword=(param.kind is inspect.Parameter.KEYWORD_ONLY),
+            )
+        )
+    return FixedSignature(parameters)
+
+
+def signature(func: TaskFn[..., object]) -> FixedSignature | VariadicSignature:
+    name = func.__name__
+    params = tuple(inspect.signature(func).parameters.values())
+    if params and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
+        return variadic(name, params)
+    return fixed(name, params)

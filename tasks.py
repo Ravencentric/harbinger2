@@ -1,3 +1,4 @@
+import builtins
 import subprocess
 from typing import Literal
 
@@ -8,7 +9,7 @@ def uvrun(*args: str) -> None:
     subprocess.run(["uv", "run", *args], check=True)
 
 
-@task
+@task(default=True)
 def lint(*, fix: bool = True) -> None:
     """Run the Ruff linter (optionally applying fixes)."""
     if fix:
@@ -17,7 +18,7 @@ def lint(*, fix: bool = True) -> None:
         uvrun("ruff", "check")
 
 
-@task
+@task(default=True)
 def format(*, check: bool = False) -> None:
     """Format code with Ruff (or verify formatting with --check)."""
     if check:
@@ -26,7 +27,7 @@ def format(*, check: bool = False) -> None:
         uvrun("ruff", "format", ".")
 
 
-@task
+@task(default=True)
 def typecheck() -> None:
     """Run the Pyrefly type checker."""
     uvrun("pyrefly", "check")
@@ -55,10 +56,15 @@ def greet(
 @task
 def echo(*args: str) -> None:
     """Echo each positional argument on its own line."""
-    print(sum(args))
+    print("\n".join(args))
 
 
-@task(default=False)
+@task
+def sum(*args: float) -> None:
+    print(builtins.sum(args))
+
+
+@task
 def ci() -> None:
     """Run all CI checks without modifying the working tree."""
     lint(fix=False)

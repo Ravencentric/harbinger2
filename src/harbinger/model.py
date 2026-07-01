@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
 
 from .errors import TaskError
-from .signature import Signature
+from .signature import FixedSignature, VariadicSignature, signature
 
 P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
@@ -26,7 +26,7 @@ TaskDecorator: TypeAlias = Callable[[TaskFn[P, R]], TaskFn[P, R]]
 class TaskSpec:
     name: str | None = None
     description: str | None = None
-    default: bool = True
+    default: bool = False
 
 
 @final
@@ -35,8 +35,8 @@ class Task:
     func: TaskFn[..., object]
     name: str
     description: str | None = None
-    default: bool = True
-    signature: Signature
+    default: bool = False
+    signature: FixedSignature | VariadicSignature
 
     @classmethod
     def from_func(cls, func: TaskFn[..., object], spec: TaskSpec) -> Task:
@@ -50,7 +50,7 @@ class Task:
             name=name,
             description=description,
             default=spec.default,
-            signature=Signature.parse(func),
+            signature=signature(func),
         )
 
     def call(self, *args: object, **kwargs: object) -> None:

@@ -55,10 +55,10 @@ harbinger hello        # run one or more tasks by name
 
 `python -m harbinger` also works.
 
-Tasks are included in `--default` by default. Mark composite/aggregator tasks with `default=False`:
+Tasks are excluded from `--default` by default. Mark CI-building tasks with `default=True` to opt them in:
 
 ```python
-@task(default=False)
+@task(default=True)
 def check() -> None:
     """Run all gates."""
     lint()
@@ -112,7 +112,21 @@ def files(*paths: Path) -> None:
 harbinger files -- a.txt b.txt c.txt
 ```
 
-A variadic parameter cannot be mixed with other parameters, and `**kwargs` is not supported. Both bans are deliberately broad: mixing `*args` with a positional makes the positional's default unreachable (argparse fills `nargs="?"` from the left), and `**kwargs` has no clean declarative mapping onto argparse. The keyword-only case (`*args` plus `--flag` options) is unambiguous and may be lifted if the need arises.
+A variadic parameter may be followed by keyword-only parameters (`*args` plus `--flag` options), which is the natural CLI pattern for commands like `cp -r src dst1 dst2`:
+
+```python
+@task
+def cp(*paths: Path, recursive: bool = False) -> None:
+    """Copy paths."""
+    for p in paths:
+        print(p, recursive)
+```
+
+```
+harbinger cp -- --recursive a.txt b.txt
+```
+
+A variadic parameter cannot be mixed with non-keyword positional parameters, and `**kwargs` is not supported. The positional case (`*args` alongside a regular positional) makes the positional's default unreachable (argparse fills `nargs="?"` from the left), and `**kwargs` has no clean declarative mapping onto argparse. Flags must precede positional values on the command line — argparse does not intermix them.
 
 ## Errors
 

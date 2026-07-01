@@ -8,7 +8,7 @@ from enum import Enum, auto
 from importlib.metadata import version
 from typing import Final, TypeAlias
 
-from ..annotation import EmptyType, LiteralType, ScalarType
+from ..annotation import IntLiteralType, ScalarType, StringLiteralType, Untyped
 from ..model import Task
 from ..signature import FixedSignature, Parameter, VariadicSignature
 
@@ -25,7 +25,7 @@ class HarbingerFlag(Enum):
 class RunSelected:
     """harbinger <task> [<task> ...]"""
 
-    names: tuple[str, ...]
+    names: Sequence[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,11 +33,12 @@ class Invoke:
     """harbinger <task> -- <args>"""
 
     name: str
-    argv: tuple[str, ...]
+    argv: Sequence[str]
 
 
 Command: TypeAlias = HarbingerFlag | RunSelected | Invoke
 ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
+
 
 @dataclass(slots=True)
 class Subparser:
@@ -52,19 +53,22 @@ class Subparser:
         )
 
     def parse(self, argv: Sequence[str]) -> ArgsKwargs:
-        match self.task.signature.kind:
-            case VariadicSignature(name, type):
+        match self.task.signature:
+            case VariadicSignature(name, type, keywords):
+                for param in keywords:
+                    self.add_kwarg(param)
                 match type:
                     case ScalarType(scalar):
                         self.parser.add_argument(name, nargs="*", type=scalar)
-                    case EmptyType():
+                    case Untyped():
                         self.parser.add_argument(name, nargs="*")
                 ns = self.parser.parse_args(argv)
-                return (getattr(ns, name), {})
+                kwargs = {param.name: getattr(ns, param.name) for param in keywords}
+                return (getattr(ns, name), kwargs)
 
             case FixedSignature(parameters=parameters):
                 for param in parameters:
-                    if param.kind.is_keyword():
+                    if param.is_keyword:
                         self.add_kwarg(param)
                     else:
                         self.add_arg(param)
@@ -73,7 +77,7 @@ class Subparser:
                 kwargs: dict[str, object] = {}
                 for param in parameters:
                     val = getattr(ns, param.name)
-                    if param.kind.is_keyword():
+                    if param.is_keyword:
                         kwargs[param.name] = val
                     else:
                         args.append(val)
@@ -82,7 +86,7 @@ class Subparser:
     def add_kwarg(self, param: Parameter) -> None:
         flag = f"--{param.name}"
         match param.type:
-            case EmptyType():
+            case Untyped():
                 self.parser.add_argument(
                     flag,
                     default=param.default,
@@ -102,20 +106,21 @@ class Subparser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
-            case LiteralType(values):
+            case StringLiteralType(values) | IntLiteralType(values) as lit:
                 self.parser.add_argument(
                     flag,
+                    type=lit.type,
                     choices=values,
                     default=param.default,
                     # The default metavar for choices doesn't do spaces after comma
                     # so we have to intervene.
-                    metavar=f"{{{', '.join(values)}}}",
+                    metavar=f"{{{', '.join(str(v) for v in values)}}}",
                     help=f"default: {param.default}",
                 )
 
     def add_arg(self, param: Parameter) -> None:
         match param.type:
-            case EmptyType():
+            case Untyped():
                 self.parser.add_argument(
                     param.name,
                     nargs="?",
@@ -130,15 +135,16 @@ class Subparser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
-            case LiteralType(values):
+            case StringLiteralType(values) | IntLiteralType(values) as literal:
                 self.parser.add_argument(
                     param.name,
+                    type=literal.type,
                     choices=values,
                     nargs="?",
                     default=param.default,
                     # The default metavar for choices doesn't do spaces after comma
                     # so we have to intervene.
-                    metavar=f"{{{', '.join(values)}}}",
+                    metavar=f"{{{', '.join(str(v) for v in values)}}}",
                     help=f"default: {param.default}",
                 )
 
@@ -209,6 +215,6 @@ def command(argv: Sequence[str]) -> Command:
                 parser.error("exactly one task must precede '--'")
 
     if args.tasks:
-        return RunSelected(names=tuple(args.tasks))
+        return RunSelected(names=args.tasks)
 
     return HarbingerFlag.LIST
