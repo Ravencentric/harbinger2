@@ -1,29 +1,27 @@
 from __future__ import annotations
 
 import importlib.util
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, overload
+from typing import TYPE_CHECKING, overload
 
 from .errors import (
-    AlreadyTaskError,
-    DuplicateTaskNameError,
+    DuplicateTaskIdError,
     HarbingerError,
     InvalidTaskFileError,
+    InvalidTaskIdError,
     TaskFileNotFoundError,
-    UndefinedTaskNameError,
+    UndefinedTaskIdError,
 )
-from .model import Task, TaskFn, TaskSpec
+from .model import MARKER, NamedCallable, Task, TaskFn, TaskId, TaskSpec
 
 if TYPE_CHECKING:
     from .model import P, R, TaskDecorator
 
-MARKER: Final = "__harbinger_task__"
-
 
 @overload
-def task(fn: TaskFn[P, R], /) -> TaskFn[P, R]: ...
+def task(fn: NamedCallable[P, R], /) -> TaskFn[P, R]: ...
 
 
 @overload
@@ -36,7 +34,7 @@ def task(
 
 
 def task(
-    fn: TaskFn[P, R] | None = None,
+    fn: NamedCallable[P, R] | None = None,
     /,
     *,
     name: str | None = None,
@@ -45,48 +43,51 @@ def task(
 ) -> TaskFn[P, R] | TaskDecorator[P, R]:
     spec = TaskSpec(name=name, description=description, default=default)
 
-    def decorator(fn: TaskFn[P, R], /) -> TaskFn[P, R]:
-        if getattr(fn, MARKER, None) is not None:
-            raise AlreadyTaskError(fn.__name__)
+    def decorator(fn: NamedCallable[P, R], /) -> TaskFn[P, R]:
         setattr(fn, MARKER, spec)
-        return fn
+        return fn  # pyrefly: ignore[bad-return]
 
     return decorator(fn) if fn is not None else decorator
 
 
 @dataclass(frozen=True, slots=True)
 class TaskRegistry:
-    store: dict[str, Task]
+    file: Path
+    store: Mapping[TaskId, Task]
 
     @classmethod
-    def load(cls, path: Path) -> TaskRegistry:
-        if not path.is_file():
-            raise TaskFileNotFoundError(path)
+    def load(cls, file: Path) -> TaskRegistry:
+        if not file.is_file():
+            raise TaskFileNotFoundError(file)
 
-        spec = importlib.util.spec_from_file_location(path.stem, path)
+        spec = importlib.util.spec_from_file_location(file.stem, file)
         if spec is None or spec.loader is None:
-            raise InvalidTaskFileError(path)
+            raise InvalidTaskFileError(file)
 
         module = importlib.util.module_from_spec(spec)
 
         try:
             spec.loader.exec_module(module)
         except HarbingerError:
+            # We have better error handling implemented for
+            # HarbingerError, so we want to propoagate it up
+            # instead of having it swallowed by the catch-all
+            # below
             raise
 
         except Exception as source:
-            raise InvalidTaskFileError(path) from source
+            raise InvalidTaskFileError(file) from source
 
-        store: dict[str, Task] = {}
-        for obj in vars(module).values():
-            spec = getattr(obj, MARKER, None)
+        store: dict[TaskId, Task] = {}
+        for func in vars(module).values():
+            spec = getattr(func, MARKER, None)
             if spec is not None:
-                task = Task.from_func(obj, spec)
-                if task.name in store:
-                    raise DuplicateTaskNameError(task.name)
-                store[task.name] = task
+                task = Task.new(func, spec)
+                if task.id in store:
+                    raise DuplicateTaskIdError(task.id)
+                store[task.id] = task
 
-        return cls(store)
+        return cls(file, store)
 
     def all(self) -> tuple[Task, ...]:
         return tuple(self.store.values())
@@ -94,17 +95,31 @@ class TaskRegistry:
     def default(self) -> tuple[Task, ...]:
         return tuple(t for t in self.store.values() if t.default)
 
-    def names(self) -> tuple[str, ...]:
-        return tuple(self.store.keys())
+    def ids(self) -> tuple[TaskId, ...]:
+        return tuple(t.id for t in self.store.values())
 
     def select(self, names: Sequence[str]) -> tuple[Task, ...]:
-        missing = tuple(n for n in names if n not in self.store)
+        missing: list[str] = []
+        invalid: list[str] = []
+        ids: list[TaskId] = []
+        for n in names:
+            id = TaskId.new(n)
+            if id is None:
+                invalid.append(n)
+            elif id not in self.store:
+                missing.append(n)
+            else:
+                ids.append(id)
+        if invalid:
+            raise InvalidTaskIdError(invalid[0])
         if missing:
-            raise UndefinedTaskNameError(missing)
-        return tuple(self.store[n] for n in names)
+            raise UndefinedTaskIdError(missing)
+        return tuple(self.store[id] for id in ids)
 
     def get(self, name: str) -> Task:
-        task = self.store.get(name)
-        if task is None:
-            raise UndefinedTaskNameError((name,))
-        return task
+        id = TaskId.new(name)
+        if id is None:
+            raise InvalidTaskIdError(name)
+        if id not in self.store:
+            raise UndefinedTaskIdError([name])
+        return self.store[id]

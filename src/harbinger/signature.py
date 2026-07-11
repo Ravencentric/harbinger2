@@ -15,7 +15,7 @@ from .errors import (
 )
 
 if TYPE_CHECKING:
-    from .model import TaskFn
+    from .model import TaskFn, TaskId
 
 
 @final
@@ -41,24 +41,24 @@ class VariadicSignature:
     kwargs: Sequence[Parameter] = ()
 
 
-def typespec(name: str, param: inspect.Parameter) -> TypeSpec:
+def typespec(id: TaskId, param: inspect.Parameter) -> TypeSpec:
     type = annotation.parse(param.annotation)
     if type is None:
         raise UnsupportedAnnotationError(
-            task=name,
+            id=id,
             param=param.name,
             annotation=param.annotation,
         )
     return type
 
 
-def variadic(name: str, params: Sequence[inspect.Parameter]) -> VariadicSignature:
+def variadic(id: TaskId, params: Sequence[inspect.Parameter]) -> VariadicSignature:
     posparam, *kwparams = params
 
     postype = annotation.parse(posparam.annotation)
     if not isinstance(postype, (ScalarType, Untyped)):
         raise UnsupportedAnnotationError(
-            task=name,
+            id=id,
             param=posparam.name,
             annotation=posparam.annotation,
         )
@@ -66,12 +66,12 @@ def variadic(name: str, params: Sequence[inspect.Parameter]) -> VariadicSignatur
     kwargs: list[Parameter] = []
     for param in kwparams:
         if param.default is inspect.Parameter.empty:
-            raise MissingDefaultError(name, param.name)
+            raise MissingDefaultError(id, param.name)
 
         kwargs.append(
             Parameter(
                 name=param.name,
-                type=typespec(name, param),
+                type=typespec(id, param),
                 default=param.default,
                 is_keyword=True,
             )
@@ -80,28 +80,28 @@ def variadic(name: str, params: Sequence[inspect.Parameter]) -> VariadicSignatur
     return VariadicSignature(name=posparam.name, type=postype, kwargs=kwargs)
 
 
-def fixed(name: str, params: Sequence[inspect.Parameter]) -> FixedSignature:
+def fixed(id: TaskId, params: Sequence[inspect.Parameter]) -> FixedSignature:
     parameters: list[Parameter] = []
     for param in params:
         if param.kind is inspect.Parameter.VAR_KEYWORD:
-            raise VarKeywordError(name, param.name)
+            raise VarKeywordError(id, param.name)
 
         if param.kind is inspect.Parameter.VAR_POSITIONAL:
-            raise MixedVariadicSignatureError(name, param.name)
+            raise MixedVariadicSignatureError(id, param.name)
 
         if param.default is inspect.Parameter.empty:
-            raise MissingDefaultError(name, param.name)
+            raise MissingDefaultError(id, param.name)
 
         if (
             param.annotation is bool
             and param.kind is not inspect.Parameter.KEYWORD_ONLY
         ):
-            raise PositionalBoolError(name, param.name)
+            raise PositionalBoolError(id, param.name)
 
         parameters.append(
             Parameter(
                 name=param.name,
-                type=typespec(name, param),
+                type=typespec(id, param),
                 default=param.default,
                 is_keyword=(param.kind is inspect.Parameter.KEYWORD_ONLY),
             )
@@ -109,9 +109,10 @@ def fixed(name: str, params: Sequence[inspect.Parameter]) -> FixedSignature:
     return FixedSignature(parameters)
 
 
-def signature(func: TaskFn[..., object]) -> FixedSignature | VariadicSignature:
-    name = func.__name__
+def signature(
+    func: TaskFn[..., object], /, *, id: TaskId
+) -> FixedSignature | VariadicSignature:
     params = tuple(inspect.signature(func).parameters.values())
     if params and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
-        return variadic(name, params)
-    return fixed(name, params)
+        return variadic(id, params)
+    return fixed(id, params)

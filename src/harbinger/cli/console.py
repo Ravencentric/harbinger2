@@ -84,5 +84,11 @@ def error(s: str, /) -> None:
     stderr(f"[red]error:[/] {s}")
 
 
+def error_with_hint(msg: str, hint_text: str, /) -> None:
+    error(msg)
+    stderr("")
+    hint(hint_text)
+
+
 def hint(s: str, /) -> None:
     stderr(f"[green]tip:[/] {s}")

@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import difflib
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .model import TaskId
 
 
 class HarbingerError(Exception):
@@ -31,17 +37,17 @@ class InvalidTaskFileError(HarbingerError):
         super().__init__(msg)
 
 
-class UndefinedTaskNameError(HarbingerError):
-    def __init__(self, names: Sequence[str]) -> None:
-        self.names = tuple(names)
-        label = "task" if len(self.names) == 1 else "tasks"
-        msg = f"unknown {label} {', '.join(repr(n) for n in self.names)}"
+class UndefinedTaskIdError(HarbingerError):
+    def __init__(self, ids: Sequence[str]) -> None:
+        self.ids = tuple(ids)
+        label = "task" if len(self.ids) == 1 else "tasks"
+        msg = f"unknown {label} {', '.join(repr(n) for n in self.ids)}"
         super().__init__(msg)
 
-    def suggest(self, available: Sequence[str]) -> Sequence[str]:
+    def suggest(self, available: Sequence[TaskId]) -> Sequence[str]:
         hints = []
-        for name in self.names:
-            match = difflib.get_close_matches(name, available, n=1)
+        for id in self.ids:
+            match = difflib.get_close_matches(id, available, n=1)
             if match:
                 hints.append(f"{match[0]!r}")
 
@@ -49,9 +55,9 @@ class UndefinedTaskNameError(HarbingerError):
 
 
 class TaskError(HarbingerError):
-    def __init__(self, name: str) -> None:
-        self.name = name
-        msg = f"task {name!r} failed"
+    def __init__(self, id: TaskId) -> None:
+        self.id = id
+        msg = f"task {id!r} failed"
         super().__init__(msg)
 
 
@@ -59,58 +65,60 @@ class TaskDefinitionError(HarbingerError):
     pass
 
 
-class AlreadyTaskError(TaskDefinitionError):
-    def __init__(self, task: str) -> None:
-        self.task = task
-        msg = f"function {task!r} is already a task"
-        super().__init__(msg)
-
-
-class DuplicateTaskNameError(TaskDefinitionError):
-    def __init__(self, task: str) -> None:
-        self.task = task
-        msg = f"duplicate task name {task!r}"
+class DuplicateTaskIdError(TaskDefinitionError):
+    def __init__(self, id: TaskId) -> None:
+        self.id = id
+        msg = f"duplicate task id {id!r}"
         super().__init__(msg)
 
 
 class VarKeywordError(TaskDefinitionError):
-    def __init__(self, task: str, param: str) -> None:
-        self.task = task
+    def __init__(self, id: TaskId, param: str) -> None:
+        self.id = id
         self.param = param
-        msg = f"task {task!r} cannot use **{param}"
+        msg = f"task {id!r} cannot use **{param}"
         super().__init__(msg)
 
 
 class MissingDefaultError(TaskDefinitionError):
-    def __init__(self, task: str, param: str) -> None:
-        self.task = task
+    def __init__(self, id: TaskId, param: str) -> None:
+        self.id = id
         self.param = param
-        msg = f"task {task!r} has parameter {param!r} without a default"
+        msg = f"task {id!r} has parameter {param!r} without a default"
         super().__init__(msg)
 
 
 class PositionalBoolError(TaskDefinitionError):
-    def __init__(self, task: str, param: str) -> None:
-        self.task = task
+    def __init__(self, id: TaskId, param: str) -> None:
+        self.id = id
         self.param = param
-        msg = f"task {task!r} has positional bool parameter {param!r}"
+        msg = f"task {id!r} has positional bool parameter {param!r}"
         super().__init__(msg)
 
 
 class UnsupportedAnnotationError(TaskDefinitionError):
-    def __init__(self, task: str, param: str, annotation: object) -> None:
+    def __init__(self, id: TaskId, param: str, annotation: object) -> None:
         self.annotation = annotation
-        self.task = task
+        self.id = id
         self.param = param
-        msg = (
-            f"task {task!r} parameter {param!r}: unsupported annotation {annotation!r}"
-        )
+        msg = f"task {id!r} parameter {param!r}: unsupported annotation {annotation!r}"
         super().__init__(msg)
 
 
 class MixedVariadicSignatureError(TaskDefinitionError):
-    def __init__(self, task: str, param: str) -> None:
-        self.task = task
+    def __init__(self, id: TaskId, param: str) -> None:
+        self.id = id
         self.param = param
-        msg = f"task {task!r} cannot mix *{param} with other parameters"
+        msg = f"task {id!r} cannot mix *{param} with other parameters"
+        super().__init__(msg)
+
+
+class InvalidTaskIdError(TaskDefinitionError):
+    def __init__(self, id: str, *, func: str | None = None) -> None:
+        self.id = id
+        self.func = func
+        if func is None:
+            msg = f"invalid task id {id!r}"
+        else:
+            msg = f"task {func!r} resolves to invalid id {id!r}"
         super().__init__(msg)

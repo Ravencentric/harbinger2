@@ -5,10 +5,11 @@ from pathlib import Path
 
 from ..errors import (
     HarbingerError,
+    InvalidTaskIdError,
     TaskDefinitionError,
     TaskError,
     TaskFileNotFoundError,
-    UndefinedTaskNameError,
+    UndefinedTaskIdError,
 )
 from ..registry import TaskRegistry
 from . import console
@@ -29,18 +30,15 @@ def main() -> int:
     try:
         registry = TaskRegistry.load(Path.cwd() / TASKFILE)
     except TaskFileNotFoundError as error:
-        console.error(error.msg)
-        console.stderr("")
-        console.hint(
-            "create [cyan]tasks.py[/] here, or run harbinger from the project root"
+        console.error_with_hint(
+            error.msg,
+            "create [cyan]tasks.py[/] here, or run harbinger from the project root",
         )
         return 2
 
     except TaskDefinitionError as error:
         err, hint = diagnostic_for(error)
-        console.error(err)
-        console.stderr("")
-        console.hint(hint)
+        console.error_with_hint(err, hint)
         return 1
 
     except HarbingerError as error:
@@ -59,7 +57,7 @@ def main() -> int:
                 run(registry.default())
 
             case HarbingerFlag.LIST:
-                show(registry.all(), TASKFILE)
+                show(registry.all(), str(registry.file))
 
             case RunSelected(names=names):
                 run(registry.select(names))
@@ -69,12 +67,19 @@ def main() -> int:
                 pos, kw = Subparser(task).parse(argv)
                 task.call(*pos, **kw)
 
-    except UndefinedTaskNameError as error:
-        label = "task" if len(error.names) == 1 else "tasks"
-        names = ", ".join(f"[yellow]{n!r}[/]" for n in error.names)
+    # Raised by registry.select() or registry.get()
+    except InvalidTaskIdError as error:
+        err, hint = diagnostic_for(error)
+        console.error_with_hint(err, hint)
+        return 2
+
+    # Raised by registry.select() or registry.get()
+    except UndefinedTaskIdError as error:
+        label = "task" if len(error.ids) == 1 else "tasks"
+        names = ", ".join(f"[yellow]{n!r}[/]" for n in error.ids)
         console.error(f"unknown {label} {names}")
 
-        available = registry.names()
+        available = registry.ids()
         hints = error.suggest(available)
 
         if hints:
@@ -93,9 +98,12 @@ def main() -> int:
         # seperator "--"
         # We can provide a nice hint here
         if (
-            len(error.names) >= 2  # Atleast two names: greet Alice
-            and error.names[0] in available  # greet is a Task
-            and error.names[1] not in available  # Alice is not a Task
+            # Atleast two names: greet Alice
+            len(error.ids) >= 2
+            # greet is a Task
+            and error.ids[0] in available
+            # The remaining aren't a task
+            and all(id not in available for id in error.ids[1:])
         ):
             console.stderr("")
             console.hint(
@@ -106,7 +114,7 @@ def main() -> int:
         return 2
 
     except TaskError as error:
-        console.error(f"task [cyan]{error.name!r}[/] failed")
+        console.error(f"task [cyan]{error.id!r}[/] failed")
         causes = causes_of(error)
         if causes:
             console.stderr(causes)

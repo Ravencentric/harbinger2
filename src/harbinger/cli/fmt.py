@@ -6,9 +6,9 @@ from collections.abc import Sequence
 
 from .. import annotation
 from ..errors import (
-    AlreadyTaskError,
-    DuplicateTaskNameError,
+    DuplicateTaskIdError,
     HarbingerError,
+    InvalidTaskIdError,
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
@@ -62,7 +62,7 @@ def causes_of(error: HarbingerError) -> str:
 def run(tasks: Sequence[Task], /) -> None:
     for i, task in enumerate(tasks):
         if len(tasks) > 1:
-            console.stdout(f"[yellow]$[/] [cyan]{task.name}[/]")
+            console.stdout(f"[yellow]$[/] [cyan]{task.id}[/]")
         task.call()
         if len(tasks) > 1 and i < len(tasks) - 1:
             console.stdout("")
@@ -77,60 +77,72 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
     header = f"{taskfile}: [dim]{total} {'task' if total == 1 else 'tasks'} (* = default)[/]\n"
     console.stdout(header)
 
-    width = max(len(task.name) for task in tasks) + 1
+    width = max(len(task.id) for task in tasks) + 1
 
     for task in tasks:
         star = "[yellow]*[/]" if task.default else " "
         desc = f"  [dim]{task.description}[/]" if task.description else ""
-        console.stdout(f"  {star} [cyan]{task.name.ljust(width)}[/]{desc}")
+        console.stdout(f"  {star} [cyan]{task.id.ljust(width)}[/]{desc}")
 
 
 def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
 
     match error:
-        case AlreadyTaskError(task=task):
+        case DuplicateTaskIdError(id=id):
             return (
-                f"function [yellow]{task!r}[/] is already a task",
-                "each function can only be decorated with [magenta]@task[/] once",
+                f"duplicate task id [yellow]{id!r}[/]",
+                "two functions resolved to the same id; use [magenta]@task(name=...)[/] to disambiguate",
             )
 
-        case DuplicateTaskNameError(task=task):
+        case VarKeywordError(id=id, param=param):
             return (
-                f"duplicate task name [yellow]{task!r}[/]",
-                "two functions resolved to the same name; use [magenta]@task(name=...)[/] to disambiguate",
-            )
-
-        case VarKeywordError(task=task, param=param):
-            return (
-                f"task [cyan]{task!r}[/] cannot use [magenta]**{param}[/]",
+                f"task [cyan]{id!r}[/] cannot use [magenta]**{param}[/]",
                 "variadic keyword args are not supported; list parameters explicitly",
             )
 
-        case MissingDefaultError(task=task, param=param):
+        case MissingDefaultError(id=id, param=param):
             return (
-                f"task [cyan]{task!r}[/] has parameter [magenta]{param!r}[/] without a default",
+                f"task [cyan]{id!r}[/] has parameter [magenta]{param!r}[/] without a default",
                 "all task parameters must have default values",
             )
 
-        case PositionalBoolError(task=task, param=param):
+        case PositionalBoolError(id=id, param=param):
             return (
-                f"task [cyan]{task!r}[/] has positional bool parameter [magenta]{param!r}[/]",
+                f"task [cyan]{id!r}[/] has positional bool parameter [magenta]{param!r}[/]",
                 f"bool parameters must be keyword-only (use [magenta]'*, {param}: bool = ...'[/])",
             )
 
-        case UnsupportedAnnotationError(annotation=ann, task=task, param=param):
+        case UnsupportedAnnotationError(annotation=ann, id=id, param=param):
             supported = ", ".join(
                 f"[magenta]{type.__name__}[/]" for type in annotation.SCALARS
             )
             return (
-                f"task [cyan]{task!r}[/] parameter [magenta]{param!r}[/]: unsupported annotation [magenta]{ann!r}[/]",
+                f"task [cyan]{id!r}[/] parameter [magenta]{param!r}[/]: unsupported annotation [magenta]{ann!r}[/]",
                 f"supported types: {supported}",
             )
 
-        case MixedVariadicSignatureError(task=task, param=param):
+        case MixedVariadicSignatureError(id=id, param=param):
             return (
-                f"task [cyan]{task!r}[/] cannot mix [magenta]*{param}[/] with other parameters",
+                f"task [cyan]{id!r}[/] cannot mix [magenta]*{param}[/] with other parameters",
                 f"remove the other parameters or replace [magenta]*{param}[/] with explicit parameters",
+            )
+
+        case InvalidTaskIdError(id=id, func=func):
+            if func is None:
+                return (
+                    f"invalid task id [yellow]{id!r}[/]",
+                    "ids must start with a letter and contain no whitespace",
+                )
+
+            if func == id:
+                return (
+                    f"task [yellow]{func!r}[/] has an invalid id",
+                    "rename it to start with a letter, or override with [magenta]@task(name=...)[/]",
+                )
+
+            return (
+                f"task [yellow]{func!r}[/] has an invalid id [yellow]{id!r}[/]",
+                "use an id that starts with a letter and contains no whitespace",
             )
 
         case _:

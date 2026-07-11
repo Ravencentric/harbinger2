@@ -48,7 +48,7 @@ class Subparser:
     def __init__(self, task: Task, /) -> None:
         self.task = task
         self.parser = argparse.ArgumentParser(
-            prog=f"harbinger {task.name} --",
+            prog=f"harbinger {task.id} --",
             description=task.description,
         )
 
