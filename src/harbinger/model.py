@@ -79,7 +79,7 @@ class Task:
         resolved = spec.name or fname
         id = TaskId.new(resolved)
         if id is None:
-            raise InvalidTaskIdError(resolved, func=fname)
+            raise InvalidTaskIdError(resolved)
         description = spec.description
         if description is None and func.__doc__:
             description = func.__doc__.strip()

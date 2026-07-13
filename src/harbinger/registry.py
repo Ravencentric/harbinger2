@@ -111,9 +111,9 @@ class TaskRegistry:
             else:
                 ids.append(id)
         if invalid:
-            raise InvalidTaskIdError(invalid[0])
+            raise InvalidTaskIdError(*invalid)
         if missing:
-            raise UndefinedTaskIdError(missing)
+            raise UndefinedTaskIdError(*missing)
         return tuple(self.store[id] for id in ids)
 
     def get(self, name: str) -> Task:
@@ -121,5 +121,5 @@ class TaskRegistry:
         if id is None:
             raise InvalidTaskIdError(name)
         if id not in self.store:
-            raise UndefinedTaskIdError([name])
+            raise UndefinedTaskIdError(name)
         return self.store[id]

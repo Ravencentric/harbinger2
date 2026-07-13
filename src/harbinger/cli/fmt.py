@@ -127,22 +127,12 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
                 f"remove the other parameters or replace [magenta]*{param}[/] with explicit parameters",
             )
 
-        case InvalidTaskIdError(id=id, func=func):
-            if func is None:
-                return (
-                    f"invalid task id [yellow]{id!r}[/]",
-                    "ids must start with a letter and contain no whitespace",
-                )
-
-            if func == id:
-                return (
-                    f"task [yellow]{func!r}[/] has an invalid id",
-                    "rename it to start with a letter, or override with [magenta]@task(name=...)[/]",
-                )
-
+        case InvalidTaskIdError(ids=ids):
+            prefix = "ids" if len(ids) > 1 else "id"
+            quoted = ", ".join(f"[yellow]{n!r}[/]" for n in ids)
             return (
-                f"task [yellow]{func!r}[/] has an invalid id [yellow]{id!r}[/]",
-                "use an id that starts with a letter and contains no whitespace",
+                f"invalid task {prefix} {quoted}",
+                "ids must start with a letter and contain no whitespace",
             )
 
         case _:

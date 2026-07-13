@@ -38,7 +38,7 @@ class InvalidTaskFileError(HarbingerError):
 
 
 class UndefinedTaskIdError(HarbingerError):
-    def __init__(self, ids: Sequence[str]) -> None:
+    def __init__(self, *ids: str) -> None:
         self.ids = tuple(ids)
         label = "task" if len(self.ids) == 1 else "tasks"
         msg = f"unknown {label} {', '.join(repr(n) for n in self.ids)}"
@@ -114,11 +114,8 @@ class MixedVariadicSignatureError(TaskDefinitionError):
 
 
 class InvalidTaskIdError(TaskDefinitionError):
-    def __init__(self, id: str, *, func: str | None = None) -> None:
-        self.id = id
-        self.func = func
-        if func is None:
-            msg = f"invalid task id {id!r}"
-        else:
-            msg = f"task {func!r} resolves to invalid id {id!r}"
+    def __init__(self, *ids: str) -> None:
+        self.ids = ids
+        label = "task id" if len(self.ids) == 1 else "task ids"
+        msg = f"invalid {label} {', '.join(repr(n) for n in self.ids)}"
         super().__init__(msg)
