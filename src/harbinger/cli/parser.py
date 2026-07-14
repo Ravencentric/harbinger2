@@ -41,7 +41,7 @@ ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
 
 
 @dataclass(slots=True)
-class Subparser:
+class TaskParser:
     task: Task
     parser: argparse.ArgumentParser
 

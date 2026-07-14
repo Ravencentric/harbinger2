@@ -19,7 +19,7 @@ from .parser import (
     HarbingerFlag,
     Invoke,
     RunSelected,
-    Subparser,
+    TaskParser,
     command,
 )
 
@@ -64,7 +64,7 @@ def main() -> int:
 
             case Invoke(name=name, argv=argv):
                 task = registry.get(name)
-                pos, kw = Subparser(task).parse(argv)
+                pos, kw = TaskParser(task).parse(argv)
                 task.call(*pos, **kw)
 
     # Raised by registry.select() or registry.get()
