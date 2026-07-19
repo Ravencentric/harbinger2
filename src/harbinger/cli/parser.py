@@ -54,17 +54,25 @@ class TaskParser:
 
     def parse(self, argv: Sequence[str]) -> ArgsKwargs:
         match self.task.signature:
-            case VariadicSignature(name, type, keywords):
-                for param in keywords:
+            case VariadicSignature(name=name, type=type, kwargs=kwargs):
+                for param in kwargs:
                     self.add_kwarg(param)
+
                 match type:
                     case ScalarType(scalar):
                         self.parser.add_argument(name, nargs="*", type=scalar)
                     case Untyped():
                         self.parser.add_argument(name, nargs="*")
+
                 ns = self.parser.parse_args(argv)
-                kwargs = {param.name: getattr(ns, param.name) for param in keywords}
-                return (getattr(ns, name), kwargs)
+                pos = getattr(ns, name)
+                kw = {}
+
+                for param in kwargs:
+                    self.add_kwarg(param)
+                    kw[param.name] = getattr(ns, param.name)
+
+                return (pos, kw)
 
             case FixedSignature(parameters=parameters):
                 for param in parameters:
@@ -72,16 +80,19 @@ class TaskParser:
                         self.add_kwarg(param)
                     else:
                         self.add_arg(param)
+
                 ns = self.parser.parse_args(argv)
-                args: list[object] = []
-                kwargs: dict[str, object] = {}
+                pos: list[object] = []
+                kw: dict[str, object] = {}
+
                 for param in parameters:
                     val = getattr(ns, param.name)
                     if param.is_keyword:
-                        kwargs[param.name] = val
+                        kw[param.name] = val
                     else:
-                        args.append(val)
-                return args, kwargs
+                        pos.append(val)
+
+                return pos, kw
 
     def add_kwarg(self, param: Parameter) -> None:
         flag = f"--{param.name}"
@@ -92,6 +103,7 @@ class TaskParser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
+
             case ScalarType(builtins.bool):
                 self.parser.add_argument(
                     flag,
@@ -99,6 +111,7 @@ class TaskParser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
+
             case ScalarType(type):
                 self.parser.add_argument(
                     flag,
@@ -106,6 +119,7 @@ class TaskParser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
+
             case StringLiteralType(values) | IntLiteralType(values) as lit:
                 self.parser.add_argument(
                     flag,
@@ -127,6 +141,7 @@ class TaskParser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
+
             case ScalarType(type):
                 self.parser.add_argument(
                     param.name,
@@ -135,6 +150,7 @@ class TaskParser:
                     default=param.default,
                     help=f"default: {param.default}",
                 )
+
             case StringLiteralType(values) | IntLiteralType(values) as literal:
                 self.parser.add_argument(
                     param.name,
