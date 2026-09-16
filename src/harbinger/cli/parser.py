@@ -64,12 +64,11 @@ class TaskParser:
                     case Untyped():
                         self.parser.add_argument(name, nargs="*")
 
-                ns = self.parser.parse_args(argv)
+                ns = self.parser.parse_intermixed_args(argv)
                 pos = getattr(ns, name)
                 kw = {}
 
                 for param in kwargs:
-                    self.add_kwarg(param)
                     kw[param.name] = getattr(ns, param.name)
 
                 return (pos, kw)

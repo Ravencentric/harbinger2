@@ -3,6 +3,7 @@ import pytest
 from harbinger.annotation import ScalarType
 from harbinger.errors import (
     MissingDefaultError,
+    MixedVariadicSignatureError,
     PositionalBoolError,
     VarKeywordError,
 )
@@ -88,6 +89,13 @@ def test_var_args_with_keywords() -> None:
     assert loud.type == ScalarType(bool)
     assert loud.default is False
     assert loud.is_keyword is True
+
+
+def test_var_args_with_positional_rejected() -> None:
+    def f(value: int = 0, *args: int) -> None: ...
+
+    with pytest.raises(MixedVariadicSignatureError):
+        signature(f, id=TaskId("f"))
 
 
 def test_var_keyword_rejected() -> None:

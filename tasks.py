@@ -1,5 +1,6 @@
 import builtins
 import subprocess
+from pathlib import Path
 from typing import Literal
 
 from harbinger import task
@@ -71,3 +72,10 @@ def ci() -> None:
     format(check=True)
     typecheck()
     test()
+
+
+@task
+def cp(*paths: Path, recursive: bool = False) -> None:
+    """Copy paths."""
+    for p in paths:
+        print(p, recursive)

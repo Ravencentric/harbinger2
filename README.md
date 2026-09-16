@@ -126,7 +126,7 @@ def cp(*paths: Path, recursive: bool = False) -> None:
 harbinger cp -- --recursive a.txt b.txt
 ```
 
-A variadic parameter cannot be mixed with non-keyword positional parameters, and `**kwargs` is not supported. The positional case (`*args` alongside a regular positional) makes the positional's default unreachable (argparse fills `nargs="?"` from the left), and `**kwargs` has no clean declarative mapping onto argparse. Flags must precede positional values on the command line — argparse does not intermix them.
+A variadic parameter cannot be mixed with non-keyword positional parameters, and `**kwargs` is not supported. The positional case (`*args` alongside a regular positional) makes the positional's default unreachable (argparse fills `nargs="?"` from the left), and `**kwargs` has no clean declarative mapping onto argparse. Flags may appear in any position, before or after the positional values.
 
 ## Errors
 
