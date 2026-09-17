@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final, Generic, ParamSpec, Protocol, TypeAlias, TypeVar, final
+from typing import (
+    Final,
+    Generic,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    final,
+    override,
+)
 
 from .errors import InvalidTaskIdError, TaskError
 from .signature import FixedSignature, VariadicSignature, signature
@@ -22,6 +31,7 @@ class NamedCallable(Protocol, Generic[P, R]):
 
 class TaskFn(NamedCallable[P, R]):
     @property
+    @override
     def __name__(self) -> str: ...
     @property
     def __harbinger_taskspec__(self) -> TaskSpec: ...

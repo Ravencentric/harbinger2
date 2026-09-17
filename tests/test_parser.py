@@ -4,7 +4,7 @@ from typing import Literal
 
 import pytest
 
-from harbinger.cli.parser import TaskParser
+from harbinger.cli.parser import HarbingerFlag, Invoke, RunSelected, TaskParser, command
 from harbinger.model import Task, TaskFn, TaskSpec
 
 
@@ -16,6 +16,40 @@ class TaskParserTester:
     def parse(self, *argv: str) -> None:
         pos, kw = self.parser.parse(argv)
         self.task.call(*pos, **kw)
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        ((), HarbingerFlag.LIST),
+        (("--list",), HarbingerFlag.LIST),
+        (("--default",), HarbingerFlag.DEFAULT),
+        (("--all",), HarbingerFlag.ALL),
+        (("lint",), RunSelected(["lint"])),
+        (("lint", "test"), RunSelected(["lint", "test"])),
+        (("greet", "--", "Alice"), Invoke("greet", ("Alice",))),
+    ],
+)
+def test_command(argv: tuple[str, ...], expected: object) -> None:
+    assert command(argv) == expected
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("--all", "lint"),
+        ("--default", "lint"),
+        ("--list", "lint"),
+    ],
+)
+def test_command_rejects_mode_with_tasks(
+    argv: tuple[str, ...], capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        command(argv)
+
+    assert excinfo.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

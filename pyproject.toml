@@ -3,7 +3,7 @@ name = "harbinger"
 version = "0.1.0"
 description = "A minimal, correct, user-friendly task runner"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 authors = [
   { name = "Ravencentric", email = "78981416+Ravencentric@users.noreply.github.com" }
 ]
@@ -26,10 +26,6 @@ build-backend = "uv_build"
 [tool.pyrefly]
 preset = "strict"
 project-includes = ["*.py", "src/**/*.py"]
-
-[tool.pyrefly.errors]
-# 3.10 doesn't have the @override decorator
-missing-override-decorator = false
 
 [tool.uv]
 exclude-newer = "1 week"

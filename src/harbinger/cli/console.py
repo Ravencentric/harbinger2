@@ -4,6 +4,7 @@ import os
 import sys
 from enum import IntEnum
 from functools import cache
+from typing import override
 
 
 class Style(IntEnum):
@@ -30,6 +31,7 @@ class Style(IntEnum):
     def to_ansi(self) -> str:
         return f"\033[{self.value}m"
 
+    @override
     def __str__(self) -> str:
         return self.to_ansi()
 
