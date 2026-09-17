@@ -147,4 +147,34 @@ Harbinger exits `0` on success, `2` on usage errors, and `1` on any other failur
 
 ## Task file
 
-The task file is always `tasks.py` in the current working directory. It runs as a standalone module — import only installed packages, not sibling files.
+The task file is always `tasks.py` in the current working directory. It is
+loaded as a standalone module, and its imports use normal Python resolution.
+Harbinger does not modify the import path or install the project on your behalf.
+
+## Scope and limitations
+
+### By design
+
+- A bare `harbinger` invocation lists tasks instead of running one implicitly.
+- Task files are trusted Python. Harbinger does not sandbox tasks or roll back
+  their effects.
+- Harbinger only looks for `tasks.py` in the current directory and uses normal
+  Python import resolution; it does not search parents or alter the import path.
+- Harbinger does not manage environments, dependencies, interpreter matrices,
+  or `.env` files. Tasks can invoke other tools when needed.
+- Booleans are keyword-only and use `--flag` / `--no-flag`.
+- Retries, timeouts, confirmation, and environment setup belong in task code.
+- Harbinger provides no build cache or plugin system.
+
+### Not currently supported
+
+- Required parameters; every fixed parameter needs a default.
+- Passing arguments when multiple tasks are selected.
+- `**kwargs`, or regular positional parameters combined with `*args`.
+- Types beyond those listed above.
+- Async or generator tasks. Return values are ignored; exceptions report failure.
+- Dependencies, richer selection, custom task-file paths, aliases,
+  machine-readable output, shell completion, and subprocess conveniences.
+
+These may be reconsidered for concrete use cases that do not substantially
+increase complexity. Parallel execution is planned after the initial release.
