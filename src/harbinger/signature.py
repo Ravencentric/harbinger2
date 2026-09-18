@@ -112,7 +112,7 @@ def fixed(id: TaskId, params: Sequence[inspect.Parameter]) -> FixedSignature:
 def signature(
     func: TaskFn[..., object], /, *, id: TaskId
 ) -> FixedSignature | VariadicSignature:
-    params = tuple(inspect.signature(func).parameters.values())
+    params = tuple(inspect.signature(func, eval_str=True).parameters.values())
     if params and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
         return variadic(id, params)
     return fixed(id, params)

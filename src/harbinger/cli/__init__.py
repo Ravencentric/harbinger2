@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Sequence
 
 from ..errors import (
     HarbingerError,
@@ -11,11 +12,13 @@ from ..errors import (
     TaskFileNotFoundError,
     UndefinedTaskIdError,
 )
+from ..model import TaskId
 from ..registry import TaskRegistry
 from . import console
 from .fmt import causes_of, diagnostic_for, run, show
 from .parser import (
     TASKFILE,
+    Command,
     HarbingerFlag,
     Invoke,
     RunSelected,
@@ -24,8 +27,30 @@ from .parser import (
 )
 
 
-def main() -> int:
-    cmd = command(sys.argv[1:])
+def hint_missing_separator(cmd: Command, tasks: Sequence[TaskId], /) -> None:
+    # Assuming someone tried running "harbinger greet Alice"
+    # where we can tell that that the first one is a real task, but the latter aren't
+    # it's possible that the user meant to pass args to the first task but forgot the
+    # seperator "--"
+    # We can provide a nice hint here
+    match cmd:
+        case RunSelected(names=[first, *rest]) if rest:
+            first = TaskId.new(first)
+            rest = (TaskId.new(task) for task in rest)
+            if (
+                first is not None
+                and first in tasks
+                and all(task is None or task not in tasks for task in rest)
+            ):
+                console.stderr("")
+                console.hint(
+                    f"if the values after {first!r} are arguments, use '--': "
+                    f"[cyan]harbinger {first} -- <args>[/]"
+                )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    cmd = command(sys.argv[1:] if argv is None else argv)
 
     try:
         registry = TaskRegistry.load(Path.cwd() / TASKFILE)
@@ -48,6 +73,10 @@ def main() -> int:
             console.stderr(causes)
         return 1
 
+    return execute(cmd, registry)
+
+
+def execute(cmd: Command, registry: TaskRegistry, /) -> int:
     try:
         match cmd:
             case HarbingerFlag.ALL:
@@ -71,6 +100,7 @@ def main() -> int:
     except InvalidTaskIdError as error:
         err, hint = diagnostic_for(error)
         console.error_with_hint(err, hint)
+        hint_missing_separator(cmd, registry.ids())
         return 2
 
     # Raised by registry.select() or registry.get()
@@ -92,24 +122,7 @@ def main() -> int:
             avail = ", ".join(f"[cyan]{a!r}[/]" for a in available)
             console.hint(f"available tasks: {avail}")
 
-        # Assuming someone tried running "harbinger greet Alice"
-        # where we can tell that that the first one is a real task, but the latter aren't
-        # it's possible that the user meant to pass args to the first task but forgot the
-        # seperator "--"
-        # We can provide a nice hint here
-        if (
-            # Atleast two names: greet Alice
-            len(error.ids) >= 2
-            # greet is a Task
-            and error.ids[0] in available
-            # The remaining aren't a task
-            and all(id not in available for id in error.ids[1:])
-        ):
-            console.stderr("")
-            console.hint(
-                "to pass arguments to a task, use '--': "
-                "[cyan]harbinger <task> -- <args>[/]"
-            )
+        hint_missing_separator(cmd, registry.ids())
 
         return 2
 
