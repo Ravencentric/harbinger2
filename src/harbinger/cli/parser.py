@@ -211,6 +211,22 @@ def command(argv: Sequence[str]) -> Command:
 
     args = parser.parse_args(head)
 
+    if has_dash:
+        if args.all:
+            parser.error("'--' cannot be combined with '--all'")
+        if args.default:
+            parser.error("'--' cannot be combined with '--default'")
+        if args.list:
+            parser.error("'--' cannot be combined with '--list'")
+
+        match args.tasks:
+            case [name]:
+                return Invoke(name=name, argv=tail)
+            case []:
+                parser.error("no task specified before '--'")
+            case _:
+                parser.error("exactly one task must precede '--'")
+
     if args.all:
         return HarbingerFlag.ALL
 
@@ -219,15 +235,6 @@ def command(argv: Sequence[str]) -> Command:
 
     if args.list:
         return HarbingerFlag.LIST
-
-    if tail:
-        match args.tasks:
-            case [name]:
-                return Invoke(name=name, argv=tail)
-            case []:
-                parser.error("no task specified before '--'")
-            case _:
-                parser.error("exactly one task must precede '--'")
 
     if args.tasks:
         return RunSelected(names=args.tasks)

@@ -27,6 +27,7 @@ class TaskParserTester:
         (("--all",), HarbingerFlag.ALL),
         (("lint",), RunSelected(["lint"])),
         (("lint", "test"), RunSelected(["lint", "test"])),
+        (("greet", "--"), Invoke("greet", ())),
         (("greet", "--", "Alice"), Invoke("greet", ("Alice",))),
     ],
 )
@@ -50,6 +51,26 @@ def test_command_rejects_mode_with_tasks(
 
     assert excinfo.value.code == 2
     assert "not allowed with argument" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("--all", "--"),
+        ("--default", "--", "argument"),
+        ("--list", "--", "argument"),
+        ("--", "argument"),
+        ("lint", "test", "--"),
+    ],
+)
+def test_command_rejects_invalid_separator_use(
+    argv: tuple[str, ...], capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        command(argv)
+
+    assert excinfo.value.code == 2
+    assert "error:" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
