@@ -174,7 +174,18 @@ def command(argv: Sequence[str]) -> Command:
 
     parser = argparse.ArgumentParser(
         prog="harbinger",
-        description=f"Run tasks from {TASKFILE}",
+        usage=(
+            "%(prog)s [--list | --all | --default]\n"
+            "       %(prog)s <task> [<task> ...]\n"
+            "       %(prog)s <task> -- [<arg> ...]"
+        ),
+        description=(
+            f"Run tasks from {TASKFILE}.\n\n"
+            "Omit <task> to list available tasks.\n"
+            "Specify multiple tasks to run them in order.\n"
+            "Use '--' to pass arguments to a single task."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     group = parser.add_mutually_exclusive_group()
@@ -206,7 +217,7 @@ def command(argv: Sequence[str]) -> Command:
         "tasks",
         metavar="<task>",
         nargs="*",
-        help="tasks to run; lists tasks when omitted",
+        help="tasks to run in order",
     )
 
     args = parser.parse_args(head)

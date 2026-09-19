@@ -1,5 +1,7 @@
 import itertools
+import os
 from pathlib import Path
+from textwrap import dedent
 from typing import Literal
 
 import pytest
@@ -33,6 +35,43 @@ class TaskParserTester:
 )
 def test_command(argv: tuple[str, ...], expected: object) -> None:
     assert command(argv) == expected
+
+
+def test_command_help(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(os, "get_terminal_size", lambda _: os.terminal_size((80, 24)))
+
+    with pytest.raises(SystemExit) as excinfo:
+        command(("--help",))
+
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out == dedent(
+        """\
+        usage: harbinger [--list | --all | --default]
+               harbinger <task> [<task> ...]
+               harbinger <task> -- [<arg> ...]
+
+        Run tasks from tasks.py.
+
+        Omit <task> to list available tasks.
+        Specify multiple tasks to run them in order.
+        Use '--' to pass arguments to a single task.
+
+        positional arguments:
+          <task>         tasks to run in order
+
+        options:
+          -h, --help     show this help message and exit
+          -a, --all      run all tasks
+          -d, --default  run default tasks only
+          -l, --list     list available tasks without running them
+          -V, --version  show program's version number and exit
+        """
+    )
+    assert captured.err == ""
 
 
 @pytest.mark.parametrize(
