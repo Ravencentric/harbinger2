@@ -58,11 +58,17 @@ class TaskParser:
                 for param in kwargs:
                     self.add_kwarg(param)
 
+                metavar = name.replace("_", "-")
                 match type:
                     case ScalarType(scalar):
-                        self.parser.add_argument(name, nargs="*", type=scalar)
+                        self.parser.add_argument(
+                            name,
+                            nargs="*",
+                            type=scalar,
+                            metavar=metavar,
+                        )
                     case Untyped():
-                        self.parser.add_argument(name, nargs="*")
+                        self.parser.add_argument(name, nargs="*", metavar=metavar)
 
                 ns = self.parser.parse_intermixed_args(argv)
                 pos = getattr(ns, name)
@@ -132,12 +138,14 @@ class TaskParser:
                 )
 
     def add_arg(self, param: Parameter) -> None:
+        metavar = param.name.replace("_", "-")
         match param.type:
             case Untyped():
                 self.parser.add_argument(
                     param.name,
                     nargs="?",
                     default=param.default,
+                    metavar=metavar,
                     help=f"default: {param.default}",
                 )
 
@@ -147,6 +155,7 @@ class TaskParser:
                     type=type,
                     nargs="?",
                     default=param.default,
+                    metavar=metavar,
                     help=f"default: {param.default}",
                 )
 

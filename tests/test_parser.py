@@ -74,6 +74,85 @@ def test_command_help(
     assert captured.err == ""
 
 
+def test_fixed_task_help(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(os, "get_terminal_size", lambda _: os.terminal_size((80, 24)))
+
+    def deploy(
+        source_dir: Path = Path("src"),
+        *,
+        environment: Literal["dev", "prod"] = "dev",
+        dry_run: bool = False,
+        retries: int = 3,
+    ) -> None:
+        """Deploy a source directory."""
+
+    with pytest.raises(SystemExit) as excinfo:
+        TaskParserTester(deploy).parse("--help")
+
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out == dedent(
+        """\
+        usage: harbinger deploy -- [-h] [--environment {dev, prod}]
+                                   [--dry-run | --no-dry-run] [--retries RETRIES]
+                                   [source-dir]
+
+        Deploy a source directory.
+
+        positional arguments:
+          source-dir            default: src
+
+        options:
+          -h, --help            show this help message and exit
+          --environment {dev, prod}
+                                default: dev
+          --dry-run, --no-dry-run
+                                default: False
+          --retries RETRIES     default: 3
+        """
+    )
+    assert captured.err == ""
+
+
+def test_variadic_task_help(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(os, "get_terminal_size", lambda _: os.terminal_size((80, 24)))
+
+    def copy_files(
+        *source_paths: Path,
+        overwrite_files: bool = False,
+    ) -> None:
+        """Copy one or more source paths."""
+
+    with pytest.raises(SystemExit) as excinfo:
+        TaskParserTester(copy_files).parse("--help")
+
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert captured.out == dedent(
+        """\
+        usage: harbinger copy-files -- [-h] [--overwrite-files | --no-overwrite-files]
+                                       [source-paths ...]
+
+        Copy one or more source paths.
+
+        positional arguments:
+          source-paths
+
+        options:
+          -h, --help            show this help message and exit
+          --overwrite-files, --no-overwrite-files
+                                default: False
+        """
+    )
+    assert captured.err == ""
+
+
 @pytest.mark.parametrize(
     "argv",
     [
