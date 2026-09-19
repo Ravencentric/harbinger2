@@ -49,13 +49,13 @@ def can_colorize() -> bool:
 
     if os.environ.get("TERM") == "dumb":
         return False
-    if not hasattr(sys.stdout, "fileno"):
+    if not hasattr(sys.stdout, "fileno") or not hasattr(sys.stderr, "fileno"):
         return False
 
     try:
-        return os.isatty(sys.stdout.fileno())
+        return os.isatty(sys.stdout.fileno()) and os.isatty(sys.stderr.fileno())
     except OSError:
-        return sys.stdout.isatty()
+        return sys.stdout.isatty() and sys.stderr.isatty()
 
 
 def render(s: str) -> str:
