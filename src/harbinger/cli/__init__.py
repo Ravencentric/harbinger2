@@ -80,13 +80,21 @@ def execute(cmd: Command, registry: TaskRegistry, /) -> int:
     try:
         match cmd:
             case HarbingerFlag.ALL:
-                run(registry.all())
+                tasks = registry.all()
+                if not tasks:
+                    console.error("no tasks found")
+                    return 2
+                run(tasks)
 
             case HarbingerFlag.DEFAULT:
-                run(registry.default())
+                tasks = registry.default()
+                if not tasks:
+                    console.error("no default tasks")
+                    return 2
+                run(tasks)
 
             case HarbingerFlag.LIST:
-                show(registry.all(), str(registry.file))
+                show(registry.all(), registry.file.name)
 
             case RunSelected(names=names):
                 run(registry.select(names))

@@ -70,14 +70,16 @@ def run(tasks: Sequence[Task], /) -> None:
 
 
 def show(tasks: Sequence[Task], taskfile: str, /) -> None:
-    if not tasks:
-        console.stdout("[dim]No tasks found.[/]")
-        return
-
     total = len(tasks)
-    header = f"{taskfile}: [dim]{total} {'task' if total == 1 else 'tasks'} (* = default)[/]\n"
+    label = "task" if total == 1 else "tasks"
+    legend = " (* = default)" if tasks else ""
+    header = f"{taskfile}: [dim]{total} {label}{legend}[/]"
     console.stdout(header)
 
+    if not tasks:
+        return
+
+    console.stdout("")
     width = max(len(task.id) for task in tasks) + 1
 
     for task in tasks:
