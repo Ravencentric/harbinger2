@@ -172,6 +172,18 @@ def test_bool_no_prefix() -> None:
     TaskParserTester(f).parse("--no-loud")
 
 
+def test_keyword_flags_use_kebab_case() -> None:
+    values = []
+
+    def f(*, dry_run: bool = False) -> None:
+        values.append(dry_run)
+
+    TaskParserTester(f).parse("--dry-run")
+    TaskParserTester(f).parse("--no-dry-run")
+
+    assert values == [True, False]
+
+
 def test_literal_choices() -> None:
     def greet(*, punct: Literal[".", "!"] = ".") -> None:
         assert punct == "!"

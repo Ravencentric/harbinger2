@@ -94,7 +94,7 @@ class TaskParser:
                 return pos, kw
 
     def add_kwarg(self, param: Parameter) -> None:
-        flag = f"--{param.name}"
+        flag = f"--{param.name.replace('_', '-')}"
         match param.type:
             case Untyped():
                 self.parser.add_argument(
