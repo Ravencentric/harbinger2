@@ -14,6 +14,7 @@ from ..errors import (
     PositionalBoolError,
     TaskDefinitionError,
     UnsupportedAnnotationError,
+    UnsupportedTaskFunctionError,
     VarKeywordError,
 )
 from ..model import Task
@@ -88,6 +89,12 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
 def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
 
     match error:
+        case UnsupportedTaskFunctionError(id=id, kind=kind):
+            return (
+                f"task [cyan]{id!r}[/] is an unsupported [magenta]{kind} function[/]",
+                "wrap it in a regular task that runs or consumes it explicitly",
+            )
+
         case DuplicateTaskIdError(id=id):
             return (
                 f"duplicate task id [yellow]{id!r}[/]",

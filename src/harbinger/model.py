@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
@@ -13,7 +14,7 @@ from typing import (
     override,
 )
 
-from .errors import InvalidTaskIdError, TaskError
+from .errors import InvalidTaskIdError, TaskError, UnsupportedTaskFunctionError
 from .signature import FixedSignature, VariadicSignature, signature
 
 P = ParamSpec("P")
@@ -90,6 +91,14 @@ class Task:
         id = TaskId.new(resolved)
         if id is None:
             raise InvalidTaskIdError(resolved)
+
+        if inspect.isasyncgenfunction(func):
+            raise UnsupportedTaskFunctionError(id, "async generator")
+        if inspect.iscoroutinefunction(func):
+            raise UnsupportedTaskFunctionError(id, "async")
+        if inspect.isgeneratorfunction(func):
+            raise UnsupportedTaskFunctionError(id, "generator")
+
         description = spec.description
         if description is None and func.__doc__:
             description = func.__doc__.strip()

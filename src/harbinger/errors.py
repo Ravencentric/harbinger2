@@ -65,6 +65,14 @@ class TaskDefinitionError(HarbingerError):
     pass
 
 
+class UnsupportedTaskFunctionError(TaskDefinitionError):
+    def __init__(self, id: TaskId, kind: str) -> None:
+        self.id = id
+        self.kind = kind
+        msg = f"task {id!r} is an unsupported {kind} function"
+        super().__init__(msg)
+
+
 class DuplicateTaskIdError(TaskDefinitionError):
     def __init__(self, id: TaskId) -> None:
         self.id = id

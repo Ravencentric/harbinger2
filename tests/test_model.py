@@ -2,7 +2,39 @@ from __future__ import annotations
 
 import pytest
 
-from harbinger.model import TaskId
+from harbinger import task
+from harbinger.errors import UnsupportedTaskFunctionError
+from harbinger.model import Task, TaskFn, TaskId
+
+
+@task
+async def async_task() -> None: ...
+
+
+@task
+def generator_task():
+    yield
+
+
+@task
+async def async_generator_task():
+    yield
+
+
+@pytest.mark.parametrize(
+    ("func", "kind"),
+    [
+        (async_task, "async"),
+        (generator_task, "generator"),
+        (async_generator_task, "async generator"),
+    ],
+)
+def test_unsupported_task_function(func: TaskFn[..., object], kind: str) -> None:
+    with pytest.raises(UnsupportedTaskFunctionError) as excinfo:
+        Task.new(func, func.__harbinger_taskspec__)
+
+    assert excinfo.value.id == func.__name__.replace("_", "-")
+    assert excinfo.value.kind == kind
 
 
 @pytest.mark.parametrize(
