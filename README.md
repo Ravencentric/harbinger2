@@ -55,6 +55,9 @@ harbinger hello        # run one or more tasks by name
 
 `python -m harbinger` also works.
 
+When multiple tasks are selected, they run in order and execution stops at the
+first failure.
+
 Tasks are excluded from `--default` by default. Mark CI-building tasks with `default=True` to opt them in:
 
 ```python

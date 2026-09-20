@@ -79,6 +79,42 @@ def test_default_rejects_empty_selection(
 
 
 @pytest.mark.parametrize(
+    "command",
+    [
+        RunSelected(("fail", "later")),
+        HarbingerFlag.ALL,
+        HarbingerFlag.DEFAULT,
+    ],
+)
+def test_multiple_tasks_stop_at_first_failure(
+    command: RunSelected | HarbingerFlag,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    called: list[str] = []
+
+    @task(default=True)
+    def fail() -> None:
+        called.append("fail")
+        raise RuntimeError("boom")
+
+    @task(default=True)
+    def later() -> None:
+        called.append("later")
+
+    tasks = (
+        Task.new(fail, fail.__harbinger_taskspec__),
+        Task.new(later, later.__harbinger_taskspec__),
+    )
+    registry = TaskRegistry(Path("tasks.py"), {task.id: task for task in tasks})
+
+    assert execute(command, registry) == 1
+    assert called == ["fail"]
+    captured = capsys.readouterr()
+    assert captured.out == "$ fail\n"
+    assert captured.err.startswith("error: task 'fail' failed\n")
+
+
+@pytest.mark.parametrize(
     ("argument", "diagnostic"),
     [
         ("Alice", "unknown task 'Alice'"),
