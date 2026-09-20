@@ -199,6 +199,41 @@ def test_multiple_tasks_stop_at_first_failure(
 
 
 @pytest.mark.parametrize(
+    ("bad_name", "diagnostic"),
+    [
+        ("missing", "unknown task 'missing'"),
+        ("0", "invalid task id '0'"),
+    ],
+)
+def test_invalid_selection_does_not_start_any_tasks(
+    bad_name: str,
+    diagnostic: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    called: list[str] = []
+
+    @task
+    def first() -> None:
+        called.append("first")
+
+    @task
+    def last() -> None:
+        called.append("last")
+
+    tasks = (
+        Task.new(first, first.__harbinger_taskspec__),
+        Task.new(last, last.__harbinger_taskspec__),
+    )
+    registry = TaskRegistry(Path("tasks.py"), {task.id: task for task in tasks})
+
+    assert execute(RunSelected(("first", bad_name, "last")), registry) == 2
+    assert called == []
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert diagnostic in captured.err
+
+
+@pytest.mark.parametrize(
     ("argument", "diagnostic"),
     [
         ("Alice", "unknown task 'Alice'"),
