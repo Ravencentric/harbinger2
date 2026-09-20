@@ -54,6 +54,29 @@ def test_task_file_failure(
     )
 
 
+def test_system_exit_while_loading_is_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    task_file = tmp_path / "tasks.py"
+    task_file.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        f"""\
+        error: could not load {task_file}
+
+        caused by:
+            0: SystemExit: 0
+               in <module>() at tasks.py:1:1
+        """
+    )
+
+
 def test_task_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -221,6 +244,35 @@ def test_multiple_tasks_stop_at_first_failure(
     captured = capsys.readouterr()
     assert captured.out == "$ fail\n"
     assert captured.err.startswith("error: task 'fail' failed\n")
+
+
+@pytest.mark.parametrize("code", [0, 2])
+def test_system_exit_is_task_failure(
+    code: int,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    called: list[str] = []
+
+    @task
+    def stop() -> None:
+        called.append("stop")
+        raise SystemExit(code)
+
+    @task
+    def later() -> None:
+        called.append("later")
+
+    tasks = (
+        Task.new(stop, stop.__harbinger_taskspec__),
+        Task.new(later, later.__harbinger_taskspec__),
+    )
+    registry = TaskRegistry(Path("tasks.py"), {task.id: task for task in tasks})
+
+    assert execute(RunSelected(("stop", "later")), registry) == 1
+    assert called == ["stop"]
+    captured = capsys.readouterr()
+    assert captured.out == "$ stop\n"
+    assert f"0: SystemExit: {code}\n" in captured.err
 
 
 def test_repeated_task_runs_once_per_occurrence(

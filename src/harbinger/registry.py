@@ -75,7 +75,7 @@ class TaskRegistry:
             # below
             raise
 
-        except Exception as source:
+        except (Exception, SystemExit) as source:
             raise InvalidTaskFileError(file) from source
 
         store: dict[TaskId, Task] = {}

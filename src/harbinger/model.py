@@ -114,5 +114,5 @@ class Task:
     def call(self, *args: object, **kwargs: object) -> None:
         try:
             self.func(*args, **kwargs)
-        except Exception as source:
+        except (Exception, SystemExit) as source:
             raise TaskError(self.id) from source

@@ -152,6 +152,9 @@ chain are printed:
 - `task '<name>' failed` — a task raised; the cause chain shows the root error.
 - `interrupted` — execution was stopped with Ctrl-C.
 
+`SystemExit`, including a zero status, is treated as a failure when raised while
+loading `tasks.py` or running a task. Successful tasks return normally.
+
 ## Task file
 
 The task file is always `tasks.py` in the current working directory. It is
