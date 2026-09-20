@@ -144,6 +144,117 @@ def test_unresolved_annotation(
     )
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(target: str) -> None: ...
+            """,
+            """\
+            error: task 'deploy' has parameter 'target' without a default
+
+            tip: all task parameters must have default values
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(target: list[str] = None) -> None: ...
+            """,
+            """\
+            error: task 'deploy' parameter 'target': unsupported annotation list[str]
+
+            tip: supported types: int, float, str, bool, Path
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(force: bool = False) -> None: ...
+            """,
+            """\
+            error: task 'deploy' has positional bool parameter 'force'
+
+            tip: bool parameters must be keyword-only (use '*, force: bool = ...')
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def build_docs() -> None: ...
+
+            @task(name="build-docs")
+            def docs() -> None: ...
+            """,
+            """\
+            error: duplicate task id 'build-docs'
+
+            tip: two functions resolved to the same id; use @task(name=...) to disambiguate
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            async def deploy() -> None: ...
+            """,
+            """\
+            error: task 'deploy' is an unsupported async function
+
+            tip: wrap it in a regular task that runs or consumes it explicitly
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy():
+                yield
+            """,
+            """\
+            error: task 'deploy' is an unsupported generator function
+
+            tip: wrap it in a regular task that runs or consumes it explicitly
+            """,
+        ),
+    ],
+    ids=[
+        "missing-default",
+        "unsupported-annotation",
+        "positional-bool",
+        "duplicate-id",
+        "async",
+        "generator",
+    ],
+)
+def test_task_definition_error(
+    source: str,
+    expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tasks.py").write_text(dedent(source), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(expected)
+
+
 def test_system_exit_while_loading_is_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
