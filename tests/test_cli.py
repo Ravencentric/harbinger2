@@ -229,6 +229,45 @@ def test_unresolved_annotation(
             tip: wrap it in a regular task that runs or consumes it explicitly
             """,
         ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(**options: str) -> None: ...
+            """,
+            """\
+            error: task 'deploy' cannot use **options
+
+            tip: variadic keyword args are not supported; list parameters explicitly
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(target: str = "prod", *files: str) -> None: ...
+            """,
+            """\
+            error: task 'deploy' cannot mix *files with other parameters
+
+            tip: remove the other parameters or replace *files with explicit parameters
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task(name="deploy-")
+            def deploy() -> None: ...
+            """,
+            """\
+            error: invalid task id 'deploy-'
+
+            tip: ids must start with a letter, end with a letter or number, and contain only printable non-whitespace characters
+            """,
+        ),
     ],
     ids=[
         "missing-default",
@@ -237,6 +276,9 @@ def test_unresolved_annotation(
         "duplicate-id",
         "async",
         "generator",
+        "variadic-keyword",
+        "mixed-variadic",
+        "invalid-id",
     ],
 )
 def test_task_definition_error(
