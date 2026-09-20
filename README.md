@@ -4,9 +4,14 @@ A minimal, correct, user-friendly task runner. Define tasks in a `tasks.py` file
 
 ## Install
 
+Harbinger requires Python 3.14 or later. Install it in the same environment as
+the project whose tasks it will run:
+
+```console
+uv add --dev harbinger
 ```
-uv add harbinger
-```
+
+Run it with `uv run harbinger`. The examples below use `harbinger` for brevity.
 
 ## Define tasks
 
@@ -35,7 +40,7 @@ def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
 
 ```python
 @task(name="greet", description="Greet someone N times")
-def greet(name: str = "World", *, count: int = 1) -> None: ...
+def welcome(name: str = "World", *, count: int = 1) -> None: ...
 ```
 
 Listings show the first line of a description; per-task help uses its full text.
@@ -48,22 +53,25 @@ contain only printable non-whitespace characters.
 
 ## Run tasks
 
-```
-harbinger              # list available tasks
-harbinger -l/--list   # same as above
-harbinger -d/--default # run default tasks only
-harbinger -a/--all    # run all tasks
-harbinger -V/--version # print version
-harbinger hello        # run one or more tasks by name
+```console
+harbinger                 # list available tasks
+harbinger --list          # list explicitly (-l)
+harbinger --default       # run default tasks only (-d)
+harbinger --all           # run all tasks (-a)
+harbinger --version       # print the version (-V)
+harbinger hello           # run one task
+harbinger hello check     # run multiple tasks in order
 ```
 
 `python -m harbinger` also works.
 
-When multiple tasks are selected, Harbinger validates the entire selection
-before starting, then runs them in order and stops at the first failure. A task
-name repeated on the command line runs once per occurrence.
+Selection modes cannot be combined. When multiple tasks are selected, Harbinger
+validates the entire selection before starting, then runs them in order and
+stops at the first failure. A task name repeated on the command line runs once
+per occurrence.
 
-Tasks are excluded from `--default` by default. Mark CI-building tasks with `default=True` to opt them in:
+Tasks are excluded from `--default` by default. Mark a task with `default=True`
+to opt it in:
 
 ```python
 @task(default=True)
@@ -75,9 +83,11 @@ def check() -> None:
 
 ### Passing arguments
 
-Use `--` to separate task arguments from harbinger's own flags. Arguments after `--` are parsed according to the task's signature:
+Use `--` to separate task arguments from Harbinger's own arguments. Exactly one
+task must precede it; arguments cannot be passed to a multi-task selection.
+Arguments after `--` are parsed according to the task's signature:
 
-```
+```console
 harbinger greet -- Alice
 harbinger greet -- Bob --count 3
 harbinger greet -- Charlie --count 2 --loud
@@ -86,13 +96,16 @@ harbinger greet -- Dana --no-loud
 
 Per-task help:
 
-```
+```console
 harbinger greet -- --help
 ```
 
+Parameter names containing underscores become kebab-case options. For example,
+`output_dir` is exposed as `--output-dir`.
+
 ## Supported parameter types
 
-Every task parameter **must have a default value**. Supported annotations:
+Every fixed task parameter **must have a default value**. Supported annotations:
 
 | Type    | Notes                                              |
 |---------|----------------------------------------------------|
@@ -116,7 +129,7 @@ def files(*paths: Path) -> None:
         print(p)
 ```
 
-```
+```console
 harbinger files -- a.txt b.txt c.txt
 ```
 
@@ -130,7 +143,7 @@ def cp(*paths: Path, recursive: bool = False) -> None:
         print(p, recursive)
 ```
 
-```
+```console
 harbinger cp -- --recursive a.txt b.txt
 ```
 
@@ -159,11 +172,15 @@ chain are printed:
 `SystemExit`, including a zero status, is treated as a failure when raised while
 loading `tasks.py` or running a task. Successful tasks return normally.
 
+`--all` is a usage error when no tasks exist, and `--default` is a usage error
+when no tasks are marked as default. Listing an empty task file succeeds.
+
 ## Task file
 
 The task file is always `tasks.py` in the current working directory. It is
 loaded as a standalone module, and its imports use normal Python resolution.
-Harbinger does not modify the import path or install the project on your behalf.
+Harbinger does not modify the import path, create an environment, or install the
+project on your behalf. Tasks run in the Harbinger process.
 
 ## Scope and limitations
 
@@ -187,7 +204,7 @@ Harbinger does not modify the import path or install the project on your behalf.
 - `**kwargs`, or regular positional parameters combined with `*args`.
 - Types beyond those listed above.
 - Async or generator tasks. Return values are ignored; exceptions report failure.
-- Dependencies, richer selection, custom task-file paths, aliases,
+- Task dependency graphs, richer selection, custom task-file paths, aliases,
   machine-readable output, shell completion, and subprocess conveniences.
 
 These may be reconsidered for concrete use cases that do not substantially
