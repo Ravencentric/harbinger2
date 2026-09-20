@@ -74,6 +74,25 @@ def test_command_help(
     assert captured.err == ""
 
 
+def test_command_rejects_abbreviated_option(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        command(("--lis",))
+
+    assert excinfo.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        usage: harbinger [--list | --all | --default]
+               harbinger <task> [<task> ...]
+               harbinger <task> -- [<arg> ...]
+        harbinger: error: unrecognized arguments: --lis
+        """
+    )
+
+
 def test_fixed_task_help(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -118,6 +137,25 @@ def test_fixed_task_help(
         """
     )
     assert captured.err == ""
+
+
+def test_task_rejects_abbreviated_option(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def deploy(*, count: int = 1) -> None: ...
+
+    with pytest.raises(SystemExit) as excinfo:
+        TaskParserTester(deploy).parse("--cou", "3")
+
+    assert excinfo.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        usage: harbinger deploy -- [-h] [--count COUNT]
+        harbinger deploy --: error: unrecognized arguments: --cou 3
+        """
+    )
 
 
 def test_variadic_task_help(

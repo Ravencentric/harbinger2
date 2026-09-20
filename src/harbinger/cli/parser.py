@@ -50,6 +50,7 @@ class TaskParser:
         self.parser = argparse.ArgumentParser(
             prog=f"harbinger {task.id} --",
             description=task.description,
+            allow_abbrev=False,
         )
 
     def parse(self, argv: Sequence[str]) -> ArgsKwargs:
@@ -183,6 +184,7 @@ def command(argv: Sequence[str]) -> Command:
 
     parser = argparse.ArgumentParser(
         prog="harbinger",
+        allow_abbrev=False,
         usage=(
             "%(prog)s [--list | --all | --default]\n"
             "       %(prog)s <task> [<task> ...]\n"
