@@ -99,9 +99,9 @@ class Task:
         if inspect.isgeneratorfunction(func):
             raise UnsupportedTaskFunctionError(id, "generator")
 
-        description = spec.description
-        if description is None and func.__doc__:
-            description = func.__doc__.strip()
+        description = spec.description if spec.description is not None else func.__doc__
+        if description is not None:
+            description = inspect.cleandoc(description)
 
         return cls(
             func=func,

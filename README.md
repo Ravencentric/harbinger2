@@ -38,6 +38,8 @@ def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
 def greet(name: str = "World", *, count: int = 1) -> None: ...
 ```
 
+Listings show the first line of a description; per-task help uses its full text.
+
 ### Name normalization
 
 Function names are converted from `snake_case` to `kebab-case`. A function named `my_task` is invoked as `harbinger my-task`.

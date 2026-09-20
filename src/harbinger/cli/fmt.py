@@ -84,8 +84,9 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
 
     for task in tasks:
         star = "[yellow]*[/]" if task.default else " "
-        desc = f"  [dim]{task.description}[/]" if task.description else ""
-        id = task.id.ljust(width) if task.description else task.id
+        description = task.description.splitlines()[0] if task.description else ""
+        desc = f"  [dim]{description}[/]" if description else ""
+        id = task.id.ljust(width) if description else task.id
         console.stdout(f"  {star} [cyan]{id}[/]{desc}")
 
 

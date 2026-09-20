@@ -87,7 +87,10 @@ def test_fixed_task_help(
         dry_run: bool = False,
         retries: int = 3,
     ) -> None:
-        """Deploy a source directory."""
+        """Deploy a source directory.
+
+        Build and upload the release.
+        """
 
     with pytest.raises(SystemExit) as excinfo:
         TaskParserTester(deploy).parse("--help")
@@ -100,7 +103,7 @@ def test_fixed_task_help(
                                    [--dry-run | --no-dry-run] [--retries RETRIES]
                                    [source-dir]
 
-        Deploy a source directory.
+        Deploy a source directory. Build and upload the release.
 
         positional arguments:
           source-dir            default: src

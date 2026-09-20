@@ -37,6 +37,21 @@ def test_unsupported_task_function(func: TaskFn[..., object], kind: str) -> None
     assert excinfo.value.kind == kind
 
 
+def test_description_is_cleaned() -> None:
+    @task
+    def deploy() -> None:
+        """Deploy the application.
+
+        Build assets and upload the release.
+        """
+
+    registered = Task.new(deploy, deploy.__harbinger_taskspec__)
+
+    assert registered.description == (
+        "Deploy the application.\n\nBuild assets and upload the release."
+    )
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [

@@ -161,9 +161,8 @@ def test_list(capsys: pytest.CaptureFixture[str]) -> None:
     @task
     def sum() -> None: ...
 
-    @task
-    def deploy() -> None:
-        """Deploy app."""
+    @task(description="Deploy app.\n\nUpload the release.")
+    def deploy() -> None: ...
 
     tasks = (
         Task.new(lint, lint.__harbinger_taskspec__),
