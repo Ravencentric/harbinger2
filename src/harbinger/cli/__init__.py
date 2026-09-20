@@ -50,6 +50,14 @@ def hint_missing_separator(cmd: Command, tasks: Sequence[TaskId], /) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        return cli(argv)
+    except KeyboardInterrupt:
+        console.error("interrupted")
+        return 130
+
+
+def cli(argv: Sequence[str] | None = None) -> int:
     cmd = command(sys.argv[1:] if argv is None else argv)
 
     try:

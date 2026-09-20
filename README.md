@@ -134,7 +134,9 @@ A variadic parameter cannot be mixed with non-keyword positional parameters, and
 
 ## Errors
 
-Harbinger exits `0` on success, `2` on usage errors, and `1` on any other failure. When a task fails, the error and its full cause chain are printed:
+Harbinger exits `0` on success, `2` on usage errors, `130` when interrupted,
+and `1` on any other failure. When a task fails, the error and its full cause
+chain are printed:
 
     error: task 'deploy' failed
 
@@ -148,6 +150,7 @@ Harbinger exits `0` on success, `2` on usage errors, and `1` on any other failur
 - `unknown task '<name>'` — includes a "did you mean" suggestion when a name is close.
 - `could not load <path>` — `tasks.py` raised at import; the cause chain shows why.
 - `task '<name>' failed` — a task raised; the cause chain shows the root error.
+- `interrupted` — execution was stopped with Ctrl-C.
 
 ## Task file
 

@@ -96,6 +96,31 @@ def test_task_failure(
     )
 
 
+def test_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tasks.py").write_text(
+        dedent(
+            """\
+            from harbinger import task
+
+            @task
+            def wait() -> None:
+                raise KeyboardInterrupt
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(("wait",)) == 130
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "error: interrupted\n"
+
+
 def test_empty_list_succeeds(capsys: pytest.CaptureFixture[str]) -> None:
     registry = TaskRegistry(Path("tasks.py"), {})
 
