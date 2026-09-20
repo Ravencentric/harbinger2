@@ -22,6 +22,11 @@ from . import console
 
 
 def location_of(exc: BaseException) -> str | None:
+    if isinstance(exc, SyntaxError) and exc.filename and exc.lineno:
+        filename = os.path.relpath(exc.filename, start=os.getcwd())
+        col = f":{exc.offset}" if exc.offset is not None else ""
+        return f"at [cyan]{filename}:{exc.lineno}{col}[/]"
+
     if (tb := exc.__traceback__) is None:
         return None
 
@@ -51,7 +56,8 @@ def causes_of(error: HarbingerError) -> str:
     lines = ["", "[yellow]caused by:[/]"]
 
     for i, cause in enumerate(causes):
-        message = f": {cause}" if str(cause) else ""
+        text = cause.msg if isinstance(cause, SyntaxError) else str(cause)
+        message = f": {text}" if text else ""
         lines.append(f"    {i}: [magenta]{type(cause).__name__}[/]{message}")
 
         if where := location_of(cause):

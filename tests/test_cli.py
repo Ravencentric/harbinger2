@@ -54,6 +54,29 @@ def test_task_file_failure(
     )
 
 
+def test_task_file_syntax_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    task_file = tmp_path / "tasks.py"
+    task_file.write_text("def broken(:\n    pass\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        f"""\
+        error: could not load {task_file}
+
+        caused by:
+            0: SyntaxError: invalid syntax
+               at tasks.py:1:12
+        """
+    )
+
+
 def test_system_exit_while_loading_is_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
