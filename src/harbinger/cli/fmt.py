@@ -85,7 +85,8 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
     for task in tasks:
         star = "[yellow]*[/]" if task.default else " "
         desc = f"  [dim]{task.description}[/]" if task.description else ""
-        console.stdout(f"  {star} [cyan]{task.id.ljust(width)}[/]{desc}")
+        id = task.id.ljust(width) if task.description else task.id
+        console.stdout(f"  {star} [cyan]{id}[/]{desc}")
 
 
 def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:

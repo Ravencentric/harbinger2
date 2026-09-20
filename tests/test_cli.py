@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -17,6 +18,39 @@ def test_empty_list_succeeds(capsys: pytest.CaptureFixture[str]) -> None:
     assert execute(HarbingerFlag.LIST, registry) == 0
     captured = capsys.readouterr()
     assert captured.out == "tasks.py: 0 tasks\n"
+    assert captured.err == ""
+
+
+def test_list(capsys: pytest.CaptureFixture[str]) -> None:
+    @task(default=True)
+    def lint() -> None:
+        """Check code."""
+
+    @task
+    def sum() -> None: ...
+
+    @task
+    def deploy() -> None:
+        """Deploy app."""
+
+    tasks = (
+        Task.new(lint, lint.__harbinger_taskspec__),
+        Task.new(sum, sum.__harbinger_taskspec__),
+        Task.new(deploy, deploy.__harbinger_taskspec__),
+    )
+    registry = TaskRegistry(Path("tasks.py"), {task.id: task for task in tasks})
+
+    assert execute(HarbingerFlag.LIST, registry) == 0
+    captured = capsys.readouterr()
+    assert captured.out == dedent(
+        """\
+        tasks.py: 3 tasks (* = default)
+
+          * lint     Check code.
+            sum
+            deploy   Deploy app.
+        """
+    )
     assert captured.err == ""
 
 
