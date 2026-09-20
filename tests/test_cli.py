@@ -6,10 +6,94 @@ from textwrap import dedent
 import pytest
 
 from harbinger import task
-from harbinger.cli import execute
+from harbinger.cli import execute, main
 from harbinger.cli.parser import HarbingerFlag, RunSelected
 from harbinger.model import Task
 from harbinger.registry import TaskRegistry
+
+
+def test_missing_task_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        f"""\
+        error: task file not found: {tmp_path / "tasks.py"}
+
+        tip: create tasks.py here, or run harbinger from the project root
+        """
+    )
+
+
+def test_task_file_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    task_file = tmp_path / "tasks.py"
+    task_file.write_text('raise RuntimeError("broken import")\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        f"""\
+        error: could not load {task_file}
+
+        caused by:
+            0: RuntimeError: broken import
+               in <module>() at tasks.py:1:1
+        """
+    )
+
+
+def test_task_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    task_file = tmp_path / "tasks.py"
+    task_file.write_text(
+        dedent(
+            """\
+            from harbinger import task
+
+            def connect() -> None:
+                raise ConnectionError("connection refused")
+
+            @task
+            def deploy() -> None:
+                try:
+                    connect()
+                except ConnectionError as source:
+                    raise RuntimeError("upload failed") from source
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(("deploy",)) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        error: task 'deploy' failed
+
+        caused by:
+            0: RuntimeError: upload failed
+               in deploy() at tasks.py:11:9
+            1: ConnectionError: connection refused
+               in connect() at tasks.py:4:5
+        """
+    )
 
 
 def test_empty_list_succeeds(capsys: pytest.CaptureFixture[str]) -> None:

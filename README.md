@@ -138,9 +138,9 @@ Harbinger exits `0` on success, `2` on usage errors, and `1` on any other failur
     error: task 'deploy' failed
 
     caused by:
-        0: region 'us-east-1' is unreachable
+        0: RuntimeError: region 'us-east-1' is unreachable
            in _upload() at tasks.py:51
-        1: connection refused for us-east-1
+        1: ConnectionError: connection refused for us-east-1
            in _connect() at tasks.py:47
 
 - `task file not found: <path>` — no `tasks.py` in the working directory.
