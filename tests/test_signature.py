@@ -7,6 +7,7 @@ from harbinger.errors import (
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    SignatureInspectionError,
     VarKeywordError,
 )
 from harbinger.model import TaskId
@@ -15,6 +16,20 @@ from harbinger.signature import (
     VariadicSignature,
     signature,
 )
+
+
+def exit_annotation() -> object:
+    raise SystemExit(0)
+
+
+def test_signature_inspection_catches_system_exit() -> None:
+    def f(value: exit_annotation() = None) -> None: ...
+
+    with pytest.raises(SignatureInspectionError) as excinfo:
+        signature(f, id=TaskId("f"))
+
+    assert isinstance(excinfo.value.source, SystemExit)
+    assert excinfo.value.source.code == 0
 
 
 def test_no_params() -> None:

@@ -10,6 +10,7 @@ from .errors import (
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    SignatureInspectionError,
     UnsupportedAnnotationError,
     VarKeywordError,
 )
@@ -112,7 +113,12 @@ def fixed(id: TaskId, params: Sequence[inspect.Parameter]) -> FixedSignature:
 def signature(
     func: TaskFn[..., object], /, *, id: TaskId
 ) -> FixedSignature | VariadicSignature:
-    params = tuple(inspect.signature(func, eval_str=True).parameters.values())
+    try:
+        inspected = inspect.signature(func, eval_str=True)
+    except (Exception, SystemExit) as source:
+        raise SignatureInspectionError(id, source) from source
+
+    params = tuple(inspected.parameters.values())
     if params and params[0].kind is inspect.Parameter.VAR_POSITIONAL:
         return variadic(id, params)
     return fixed(id, params)

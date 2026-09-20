@@ -77,6 +77,73 @@ def test_task_file_syntax_error(
     )
 
 
+def test_signature_inspection_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tasks.py").write_text(
+        dedent(
+            """\
+            from __future__ import annotations
+
+            from harbinger import task
+
+            def broken_annotation() -> object:
+                raise ZeroDivisionError("broken annotation")
+
+            @task
+            def deploy(target: broken_annotation() = None) -> None: ...
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        error: could not inspect task 'deploy' signature
+
+        tip: signature inspection raised ZeroDivisionError: broken annotation
+        """
+    )
+
+
+def test_unresolved_annotation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tasks.py").write_text(
+        dedent(
+            """\
+            from __future__ import annotations
+
+            from harbinger import task
+
+            @task
+            def deploy(target: MissingType = None) -> None: ...
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(()) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        error: could not inspect task 'deploy' signature
+
+        tip: signature inspection raised NameError: name 'MissingType' is not defined
+        """
+    )
+
+
 def test_system_exit_while_loading_is_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -65,6 +65,14 @@ class TaskDefinitionError(HarbingerError):
     pass
 
 
+class SignatureInspectionError(TaskDefinitionError):
+    def __init__(self, id: TaskId, source: BaseException) -> None:
+        self.id = id
+        self.source = source
+        msg = f"could not inspect task {id!r} signature"
+        super().__init__(msg)
+
+
 class UnsupportedTaskFunctionError(TaskDefinitionError):
     def __init__(self, id: TaskId, kind: str) -> None:
         self.id = id

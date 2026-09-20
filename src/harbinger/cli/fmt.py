@@ -12,6 +12,7 @@ from ..errors import (
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    SignatureInspectionError,
     TaskDefinitionError,
     UnsupportedAnnotationError,
     UnsupportedTaskFunctionError,
@@ -99,6 +100,13 @@ def show(tasks: Sequence[Task], taskfile: str, /) -> None:
 def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
 
     match error:
+        case SignatureInspectionError(id=id, source=source):
+            message = f": {source}" if str(source) else ""
+            return (
+                f"could not inspect task [cyan]{id!r}[/] signature",
+                f"signature inspection raised [magenta]{type(source).__name__}[/]{message}",
+            )
+
         case UnsupportedTaskFunctionError(id=id, kind=kind):
             return (
                 f"task [cyan]{id!r}[/] is an unsupported [magenta]{kind} function[/]",
