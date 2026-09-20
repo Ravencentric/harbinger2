@@ -198,6 +198,25 @@ def test_multiple_tasks_stop_at_first_failure(
     assert captured.err.startswith("error: task 'fail' failed\n")
 
 
+def test_repeated_task_runs_once_per_occurrence(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    called: list[str] = []
+
+    @task
+    def repeat() -> None:
+        called.append("repeat")
+
+    registered = Task.new(repeat, repeat.__harbinger_taskspec__)
+    registry = TaskRegistry(Path("tasks.py"), {registered.id: registered})
+
+    assert execute(RunSelected(("repeat", "repeat")), registry) == 0
+    assert called == ["repeat", "repeat"]
+    captured = capsys.readouterr()
+    assert captured.out == "$ repeat\n\n$ repeat\n"
+    assert captured.err == ""
+
+
 @pytest.mark.parametrize(
     ("bad_name", "diagnostic"),
     [

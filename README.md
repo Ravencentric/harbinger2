@@ -56,7 +56,8 @@ harbinger hello        # run one or more tasks by name
 `python -m harbinger` also works.
 
 When multiple tasks are selected, Harbinger validates the entire selection
-before starting, then runs them in order and stops at the first failure.
+before starting, then runs them in order and stops at the first failure. A task
+name repeated on the command line runs once per occurrence.
 
 Tasks are excluded from `--default` by default. Mark CI-building tasks with `default=True` to opt them in:
 
