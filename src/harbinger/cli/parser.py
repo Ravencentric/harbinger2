@@ -30,7 +30,7 @@ class RunSelected:
 
 @dataclass(frozen=True, slots=True)
 class Invoke:
-    """harbinger <task> -- <args>"""
+    """harbinger <task> -- [<arg> ...]"""
 
     name: str
     argv: Sequence[str]

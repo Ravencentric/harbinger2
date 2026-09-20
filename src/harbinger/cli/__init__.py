@@ -27,26 +27,24 @@ from .parser import (
 )
 
 
-def hint_missing_separator(cmd: Command, tasks: Sequence[TaskId], /) -> None:
-    # Assuming someone tried running "harbinger greet Alice"
-    # where we can tell that that the first one is a real task, but the latter aren't
-    # it's possible that the user meant to pass args to the first task but forgot the
-    # seperator "--"
-    # We can provide a nice hint here
+def missing_separator_hint(cmd: Command, tasks: Sequence[TaskId], /) -> str | None:
     match cmd:
         case RunSelected(names=[first, *rest]) if rest:
             first = TaskId.new(first)
             rest = (TaskId.new(task) for task in rest)
+            # A valid first task followed only by unknown or invalid names often
+            # means the user omitted the argument separator.
             if (
                 first is not None
                 and first in tasks
                 and all(task is None or task not in tasks for task in rest)
             ):
-                console.stderr("")
-                console.hint(
+                return (
                     f"if the values after {first!r} are arguments, use '--': "
-                    f"[cyan]harbinger {first} -- <args>[/]"
+                    f"[cyan]harbinger {first} -- <arg> ...[/]"
                 )
+
+    return None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -116,7 +114,9 @@ def execute(cmd: Command, registry: TaskRegistry, /) -> int:
     except InvalidTaskIdError as error:
         err, hint = diagnostic_for(error)
         console.error_with_hint(err, hint)
-        hint_missing_separator(cmd, registry.ids())
+        if hint := missing_separator_hint(cmd, registry.ids()):
+            console.stderr("")
+            console.hint(hint)
         return 2
 
     # Raised by registry.select() or registry.get()
@@ -133,12 +133,14 @@ def execute(cmd: Command, registry: TaskRegistry, /) -> int:
             suggested = ", ".join(f"[cyan]{h}[/]" for h in hints)
             console.hint(f"did you mean {suggested}?")
 
+        elif hint := missing_separator_hint(cmd, available):
+            console.stderr("")
+            console.hint(hint)
+
         elif available:
             console.stderr("")
             avail = ", ".join(f"[cyan]{a!r}[/]" for a in available)
             console.hint(f"available tasks: {avail}")
-
-        hint_missing_separator(cmd, registry.ids())
 
         return 2
 

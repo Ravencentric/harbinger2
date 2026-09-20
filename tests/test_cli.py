@@ -330,16 +330,36 @@ def test_invalid_selection_does_not_start_any_tasks(
 
 
 @pytest.mark.parametrize(
-    ("argument", "diagnostic"),
+    ("argument", "expected"),
     [
-        ("Alice", "unknown task 'Alice'"),
-        ("0", "invalid task id '0'"),
+        (
+            "Alice",
+            dedent(
+                """\
+                error: unknown task 'Alice'
+
+                tip: if the values after 'greet' are arguments, use '--': harbinger greet -- <arg> ...
+                """
+            ),
+        ),
+        (
+            "0",
+            dedent(
+                """\
+                error: invalid task id '0'
+
+                tip: ids must start with a letter and contain no whitespace
+
+                tip: if the values after 'greet' are arguments, use '--': harbinger greet -- <arg> ...
+                """
+            ),
+        ),
     ],
 )
 def test_missing_separator_hint(
     capsys: pytest.CaptureFixture[str],
     argument: str,
-    diagnostic: str,
+    expected: str,
 ) -> None:
     @task
     def greet(name: str = "world") -> None: ...
@@ -351,7 +371,33 @@ def test_missing_separator_hint(
     )
 
     assert execute(RunSelected(("greet", argument)), registry) == 2
-    err = capsys.readouterr().err
-    assert diagnostic in err
-    assert "if the values after 'greet' are arguments" in err
-    assert "harbinger greet -- <args>" in err
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == expected
+
+
+def test_close_task_match_wins_over_missing_separator_hint(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    @task
+    def lint() -> None: ...
+
+    @task
+    def test() -> None: ...
+
+    tasks = (
+        Task.new(lint, lint.__harbinger_taskspec__),
+        Task.new(test, test.__harbinger_taskspec__),
+    )
+    registry = TaskRegistry(Path("tasks.py"), {task.id: task for task in tasks})
+
+    assert execute(RunSelected(("lint", "tes")), registry) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == dedent(
+        """\
+        error: unknown task 'tes'
+
+        tip: did you mean 'test'?
+        """
+    )
