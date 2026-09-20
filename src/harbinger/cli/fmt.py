@@ -142,7 +142,8 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
             quoted = ", ".join(f"[yellow]{n!r}[/]" for n in ids)
             return (
                 f"invalid task {prefix} {quoted}",
-                "ids must start with a letter and contain no whitespace",
+                "ids must start with a letter, end with a letter or number, "
+                "and contain only printable non-whitespace characters",
             )
 
         case _:

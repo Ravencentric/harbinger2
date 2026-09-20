@@ -62,6 +62,7 @@ def test_valid(raw: str, expected: str) -> None:
         "foo-",
         "my task",
         "my\ttask",
+        "foo\x00bar",
     ],
 )
 def test_invalid(raw: str) -> None:

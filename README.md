@@ -41,6 +41,8 @@ def greet(name: str = "World", *, count: int = 1) -> None: ...
 ### Name normalization
 
 Function names are converted from `snake_case` to `kebab-case`. A function named `my_task` is invoked as `harbinger my-task`.
+Task names must start with a letter, end with a letter or number, and otherwise
+contain only printable non-whitespace characters.
 
 ## Run tasks
 

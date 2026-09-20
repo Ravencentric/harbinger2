@@ -330,6 +330,44 @@ def test_invalid_selection_does_not_start_any_tasks(
 
 
 @pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        (
+            "foo-",
+            dedent(
+                """\
+                error: invalid task id 'foo-'
+
+                tip: ids must start with a letter, end with a letter or number, and contain only printable non-whitespace characters
+                """
+            ),
+        ),
+        (
+            "foo\x00bar",
+            dedent(
+                """\
+                error: invalid task id 'foo\\x00bar'
+
+                tip: ids must start with a letter, end with a letter or number, and contain only printable non-whitespace characters
+                """
+            ),
+        ),
+    ],
+)
+def test_invalid_task_id_diagnostic(
+    name: str,
+    expected: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    registry = TaskRegistry(Path("tasks.py"), {})
+
+    assert execute(RunSelected((name,)), registry) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == expected
+
+
+@pytest.mark.parametrize(
     ("argument", "expected"),
     [
         (
@@ -348,7 +386,7 @@ def test_invalid_selection_does_not_start_any_tasks(
                 """\
                 error: invalid task id '0'
 
-                tip: ids must start with a letter and contain no whitespace
+                tip: ids must start with a letter, end with a letter or number, and contain only printable non-whitespace characters
 
                 tip: if the values after 'greet' are arguments, use '--': harbinger greet -- <arg> ...
                 """
