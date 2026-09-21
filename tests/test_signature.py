@@ -124,6 +124,13 @@ def test_var_keyword_rejected() -> None:
         signature(f, id=TaskId("f"))
 
 
+def test_var_keyword_after_var_args_rejected() -> None:
+    def f(*args: int, **kwargs: int) -> None: ...
+
+    with pytest.raises(VarKeywordError):
+        signature(f, id=TaskId("f"))
+
+
 def test_missing_default_rejected() -> None:
     def f(a: int) -> None: ...
 

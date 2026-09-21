@@ -247,6 +247,19 @@ def test_unresolved_annotation(
             from harbinger import task
 
             @task
+            def deploy(*files: str, **options: str) -> None: ...
+            """,
+            """\
+            error: task 'deploy' cannot use **options
+
+            tip: variadic keyword args are not supported; list parameters explicitly
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
             def deploy(target: str = "prod", *files: str) -> None: ...
             """,
             """\
@@ -303,6 +316,7 @@ def test_unresolved_annotation(
         "async",
         "generator",
         "variadic-keyword",
+        "variadic-with-keyword",
         "mixed-variadic",
         "invalid-id",
         "reserved-option",

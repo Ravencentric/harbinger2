@@ -84,6 +84,9 @@ def variadic(id: TaskId, params: Sequence[inspect.Parameter]) -> VariadicSignatu
 
     kwargs: list[Parameter] = []
     for param in kwparams:
+        if param.kind is inspect.Parameter.VAR_KEYWORD:
+            raise VarKeywordError(id, param.name)
+
         if param.default is inspect.Parameter.empty:
             raise MissingDefaultError(id, param.name)
 
