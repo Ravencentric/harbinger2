@@ -24,9 +24,17 @@ from ..model import Task
 from . import console
 
 
+def relpath(filename: str, /) -> str:
+    try:
+        return os.path.relpath(filename, start=os.getcwd())
+    except ValueError:
+        # relpath cannot cross drive or UNC mount boundaries on Windows.
+        return os.path.abspath(filename)
+
+
 def location_of(exc: BaseException) -> str | None:
     if isinstance(exc, SyntaxError) and exc.filename and exc.lineno:
-        filename = os.path.relpath(exc.filename, start=os.getcwd())
+        filename = relpath(exc.filename)
         col = f":{exc.offset}" if exc.offset is not None else ""
         return f"at [cyan]{filename}:{exc.lineno}{col}[/]"
 
@@ -46,7 +54,7 @@ def location_of(exc: BaseException) -> str | None:
     if frame is None:
         return None
 
-    filename = os.path.relpath(frame.filename, start=os.getcwd())
+    filename = relpath(frame.filename)
     col = f":{frame.colno + 1}" if frame.colno is not None else ""
 
     return f"in [magenta]{frame.name}()[/] at [cyan]{filename}:{frame.lineno}{col}[/]"
