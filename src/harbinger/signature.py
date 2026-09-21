@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING, Sequence, final
 from . import annotation
 from .annotation import Scalar, ScalarType, TypeSpec, Untyped
 from .errors import (
+    BooleanOptionConflictError,
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    ReservedOptionError,
     SignatureInspectionError,
     UnsupportedAnnotationError,
     VarKeywordError,
@@ -40,6 +42,22 @@ class VariadicSignature:
     name: str
     type: ScalarType | Untyped
     kwargs: Sequence[Parameter] = ()
+
+
+def check(id: TaskId, params: Sequence[Parameter], /) -> None:
+    keywords = {param.name: param for param in params if param.is_keyword}
+
+    if "help" in keywords:
+        raise ReservedOptionError(id, "help")
+
+    # BooleanOptionalAction adds --no-<name> alongside the declared option.
+    for param in keywords.values():
+        if param.type != ScalarType(bool):
+            continue
+
+        conflict = f"no_{param.name}"
+        if conflict in keywords:
+            raise BooleanOptionConflictError(id, param.name, conflict)
 
 
 def typespec(id: TaskId, param: inspect.Parameter) -> TypeSpec:
@@ -78,6 +96,7 @@ def variadic(id: TaskId, params: Sequence[inspect.Parameter]) -> VariadicSignatu
             )
         )
 
+    check(id, kwargs)
     return VariadicSignature(name=posparam.name, type=postype, kwargs=kwargs)
 
 
@@ -107,6 +126,7 @@ def fixed(id: TaskId, params: Sequence[inspect.Parameter]) -> FixedSignature:
                 is_keyword=(param.kind is inspect.Parameter.KEYWORD_ONLY),
             )
         )
+    check(id, parameters)
     return FixedSignature(parameters)
 
 

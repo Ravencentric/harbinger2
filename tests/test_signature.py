@@ -4,9 +4,11 @@ import pytest
 
 from harbinger.annotation import ScalarType
 from harbinger.errors import (
+    BooleanOptionConflictError,
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    ReservedOptionError,
     SignatureInspectionError,
     VarKeywordError,
 )
@@ -134,3 +136,34 @@ def test_positional_bool_rejected() -> None:
 
     with pytest.raises(PositionalBoolError):
         signature(f, id=TaskId("f"))
+
+
+def test_reserved_option_rejected() -> None:
+    def f(*, help: str = "") -> None: ...
+
+    with pytest.raises(ReservedOptionError) as excinfo:
+        signature(f, id=TaskId("f"))
+
+    assert excinfo.value.option == "--help"
+    assert excinfo.value.param == "help"
+
+
+def test_positional_help_allowed() -> None:
+    def f(help: str = "") -> None: ...
+
+    sig = signature(f, id=TaskId("f"))
+
+    assert isinstance(sig, FixedSignature)
+    assert sig.parameters[0].name == "help"
+    assert sig.parameters[0].is_keyword is False
+
+
+def test_generated_option_collision_rejected() -> None:
+    def f(*args: str, force: bool = False, no_force: str = "") -> None: ...
+
+    with pytest.raises(BooleanOptionConflictError) as excinfo:
+        signature(f, id=TaskId("f"))
+
+    assert excinfo.value.option == "--no-force"
+    assert excinfo.value.param == "force"
+    assert excinfo.value.conflict == "no_force"

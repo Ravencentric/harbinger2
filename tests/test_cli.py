@@ -268,6 +268,32 @@ def test_unresolved_annotation(
             tip: ids must start with a letter, end with a letter or number, and contain only printable non-whitespace characters
             """,
         ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(*, help: str = "") -> None: ...
+            """,
+            """\
+            error: task 'deploy' parameter 'help' conflicts with reserved option '--help'
+
+            tip: rename the parameter; --help is reserved for task help
+            """,
+        ),
+        (
+            """\
+            from harbinger import task
+
+            @task
+            def deploy(*, force: bool = False, no_force: str = "") -> None: ...
+            """,
+            """\
+            error: task 'deploy' parameters 'force' and 'no_force' both define option '--no-force'
+
+            tip: rename one parameter so its command-line option is unique
+            """,
+        ),
     ],
     ids=[
         "missing-default",
@@ -279,6 +305,8 @@ def test_unresolved_annotation(
         "variadic-keyword",
         "mixed-variadic",
         "invalid-id",
+        "reserved-option",
+        "option-collision",
     ],
 )
 def test_task_definition_error(

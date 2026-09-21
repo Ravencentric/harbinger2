@@ -6,12 +6,14 @@ from collections.abc import Sequence
 
 from .. import annotation
 from ..errors import (
+    BooleanOptionConflictError,
     DuplicateTaskIdError,
     HarbingerError,
     InvalidTaskIdError,
     MissingDefaultError,
     MixedVariadicSignatureError,
     PositionalBoolError,
+    ReservedOptionError,
     SignatureInspectionError,
     TaskDefinitionError,
     UnsupportedAnnotationError,
@@ -150,6 +152,23 @@ def diagnostic_for(error: TaskDefinitionError) -> tuple[str, str]:
             return (
                 f"task [cyan]{id!r}[/] cannot mix [magenta]*{param}[/] with other parameters",
                 f"remove the other parameters or replace [magenta]*{param}[/] with explicit parameters",
+            )
+
+        case ReservedOptionError(id=id, option=option, param=param):
+            return (
+                f"task [cyan]{id!r}[/] parameter [magenta]{param!r}[/] conflicts with reserved option [yellow]{option!r}[/]",
+                f"rename the parameter; [yellow]{option}[/] is reserved for task help",
+            )
+
+        case BooleanOptionConflictError(
+            id=id,
+            option=option,
+            param=param,
+            conflict=conflict,
+        ):
+            return (
+                f"task [cyan]{id!r}[/] parameters [magenta]{param!r}[/] and [magenta]{conflict!r}[/] both define option [yellow]{option!r}[/]",
+                "rename one parameter so its command-line option is unique",
             )
 
         case InvalidTaskIdError(ids=ids):

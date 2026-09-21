@@ -129,6 +129,36 @@ class MixedVariadicSignatureError(TaskDefinitionError):
         super().__init__(msg)
 
 
+class ReservedOptionError(TaskDefinitionError):
+    def __init__(self, id: TaskId, param: str) -> None:
+        self.id = id
+        self.param = param
+        self.option = f"--{param.replace('_', '-')}"
+        msg = (
+            f"task {id!r} parameter {param!r} "
+            f"conflicts with reserved option {self.option!r}"
+        )
+        super().__init__(msg)
+
+
+class BooleanOptionConflictError(TaskDefinitionError):
+    def __init__(
+        self,
+        id: TaskId,
+        param: str,
+        conflict: str,
+    ) -> None:
+        self.id = id
+        self.param = param
+        self.conflict = conflict
+        self.option = f"--no-{param.replace('_', '-')}"
+        msg = (
+            f"task {id!r} parameters {param!r} and {conflict!r} "
+            f"both define option {self.option!r}"
+        )
+        super().__init__(msg)
+
+
 class InvalidTaskIdError(TaskDefinitionError):
     def __init__(self, *ids: str) -> None:
         self.ids = ids
