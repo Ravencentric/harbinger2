@@ -77,6 +77,34 @@ def test_task_file_syntax_error(
     )
 
 
+def test_task_file_with_deferred_dataclass_annotations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tasks.py").write_text(
+        dedent(
+            """\
+            from __future__ import annotations
+
+            from dataclasses import dataclass
+            from harbinger import task
+
+            @dataclass
+            class Config:
+                value: int = 7
+
+            @task
+            def check() -> None:
+                assert Config().value == 7
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(("check",)) == 0
+
+
 def test_signature_inspection_error(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
