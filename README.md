@@ -107,15 +107,29 @@ Parameter names containing underscores become kebab-case options. For example,
 
 Every fixed task parameter **must have a default value**. Supported annotations:
 
-| Type    | Notes                                              |
-|---------|----------------------------------------------------|
-| `str`   |                                                    |
-| `int`   |                                                    |
-| `float` |                                                    |
-| `bool`  | Must be keyword-only (use `*, flag: bool = False`) |
-| `Path`  | From `pathlib`                                     |
+| Type                     | Notes                                              |
+|--------------------------|----------------------------------------------------|
+| `str`                    |                                                    |
+| `int`                    |                                                    |
+| `float`                  |                                                    |
+| `bool`                   | Must be keyword-only (use `*, flag: bool = False`) |
+| `Path`                   | From `pathlib`                                     |
+| `Literal["dev", "prod"]` | String choices from `typing`                       |
+| `Literal[1, 2]`          | Integer choices from `typing`                      |
 
 Unannotated parameters are treated as `str`. `bool` parameters expose `--flag` / `--no-flag`.
+
+`Literal` choices must all be strings or all integers. For example:
+
+```python
+from typing import Literal
+
+@task
+def deploy(*, environment: Literal["dev", "prod"] = "dev") -> None:
+    print(environment)
+```
+
+`harbinger deploy -- --help` shows `--environment {dev, prod}`.
 
 ### Variadic tasks
 
