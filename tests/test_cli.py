@@ -362,7 +362,48 @@ def test_system_exit_while_loading_is_failure(
     )
 
 
+@pytest.mark.parametrize(
+    ("statement", "expected"),
+    [
+        (
+            'raise RuntimeError("upload failed")',
+            """\
+            error: task 'deploy' failed
+
+            caused by:
+                0: RuntimeError: upload failed
+                   in deploy() at tasks.py:11:9
+                1: ConnectionError: connection refused
+                   in connect() at tasks.py:4:5
+            """,
+        ),
+        (
+            'raise RuntimeError("upload failed") from None',
+            """\
+            error: task 'deploy' failed
+
+            caused by:
+                0: RuntimeError: upload failed
+                   in deploy() at tasks.py:11:9
+            """,
+        ),
+        (
+            'raise RuntimeError("upload failed") from ValueError("explicit cause")',
+            """\
+            error: task 'deploy' failed
+
+            caused by:
+                0: RuntimeError: upload failed
+                   in deploy() at tasks.py:11:9
+                1: ValueError: explicit cause
+            """,
+        ),
+    ],
+    ids=["implicit-context", "suppressed-context", "explicit-cause"],
+)
 def test_task_failure(
+    statement: str,
+    expected: str,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -370,7 +411,7 @@ def test_task_failure(
     task_file = tmp_path / "tasks.py"
     task_file.write_text(
         dedent(
-            """\
+            f"""\
             from harbinger import task
 
             def connect() -> None:
@@ -380,8 +421,8 @@ def test_task_failure(
             def deploy() -> None:
                 try:
                     connect()
-                except ConnectionError as source:
-                    raise RuntimeError("upload failed") from source
+                except ConnectionError:
+                    {statement}
             """
         ),
         encoding="utf-8",
@@ -391,17 +432,7 @@ def test_task_failure(
     assert main(("deploy",)) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err == dedent(
-        """\
-        error: task 'deploy' failed
-
-        caused by:
-            0: RuntimeError: upload failed
-               in deploy() at tasks.py:11:9
-            1: ConnectionError: connection refused
-               in connect() at tasks.py:4:5
-        """
-    )
+    assert captured.err == dedent(expected)
 
 
 def test_keyboard_interrupt(

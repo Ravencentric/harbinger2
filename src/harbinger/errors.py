@@ -15,11 +15,24 @@ class HarbingerError(Exception):
         super().__init__(msg)
 
     def causes(self) -> list[BaseException]:
-        causes = []
-        current = self.__cause__
-        while current is not None:
-            causes.append(current)
-            current = current.__cause__
+        causes: list[BaseException] = []
+        current: BaseException = self
+
+        while True:
+            linked = current.__cause__
+            if linked is None and not current.__suppress_context__:
+                linked = current.__context__
+
+            if (
+                linked is None
+                or linked is self
+                or any(linked is cause for cause in causes)
+            ):
+                break
+
+            causes.append(linked)
+            current = linked
+
         return causes
 
 
