@@ -26,7 +26,6 @@ class TaskParserTester:
         ((), HarbingerFlag.LIST),
         (("--list",), HarbingerFlag.LIST),
         (("--default",), HarbingerFlag.DEFAULT),
-        (("--all",), HarbingerFlag.ALL),
         (("lint",), RunSelected(["lint"])),
         (("lint", "test"), RunSelected(["lint", "test"])),
         (("greet", "--"), Invoke("greet", ())),
@@ -50,7 +49,7 @@ def test_command_help(
     captured = capsys.readouterr()
     assert captured.out == dedent(
         """\
-        usage: harbinger [--list | --all | --default]
+        usage: harbinger [--list | --default]
                harbinger <task> [<task> ...]
                harbinger <task> -- [<arg> ...]
 
@@ -65,7 +64,6 @@ def test_command_help(
 
         options:
           -h, --help     show this help message and exit
-          -a, --all      run all tasks
           -d, --default  run default tasks only
           -l, --list     list available tasks without running them
           -V, --version  show program's version number and exit
@@ -85,7 +83,7 @@ def test_command_rejects_abbreviated_option(
     assert captured.out == ""
     assert captured.err == dedent(
         """\
-        usage: harbinger [--list | --all | --default]
+        usage: harbinger [--list | --default]
                harbinger <task> [<task> ...]
                harbinger <task> -- [<arg> ...]
         harbinger: error: unrecognized arguments: --lis
@@ -197,7 +195,6 @@ def test_variadic_task_help(
 @pytest.mark.parametrize(
     "argv",
     [
-        ("--all", "lint"),
         ("--default", "lint"),
         ("--list", "lint"),
     ],
@@ -215,7 +212,6 @@ def test_command_rejects_mode_with_tasks(
 @pytest.mark.parametrize(
     "argv",
     [
-        ("--all", "--"),
         ("--default", "--", "argument"),
         ("--list", "--", "argument"),
         ("--", "argument"),

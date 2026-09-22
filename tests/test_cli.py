@@ -529,15 +529,6 @@ def test_list(capsys: pytest.CaptureFixture[str]) -> None:
     assert captured.err == ""
 
 
-def test_all_rejects_empty_registry(capsys: pytest.CaptureFixture[str]) -> None:
-    registry = TaskRegistry(Path("tasks.py"), {})
-
-    assert execute(HarbingerFlag.ALL, registry) == 2
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == "error: no tasks found\n"
-
-
 def test_default_rejects_empty_selection(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -557,7 +548,6 @@ def test_default_rejects_empty_selection(
     "command",
     [
         RunSelected(("fail", "later")),
-        HarbingerFlag.ALL,
         HarbingerFlag.DEFAULT,
     ],
 )

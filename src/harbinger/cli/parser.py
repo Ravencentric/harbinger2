@@ -16,7 +16,6 @@ TASKFILE: Final = "tasks.py"
 
 
 class HarbingerFlag(Enum):
-    ALL = auto()
     DEFAULT = auto()
     LIST = auto()
 
@@ -186,7 +185,7 @@ def command(argv: Sequence[str]) -> Command:
         prog="harbinger",
         allow_abbrev=False,
         usage=(
-            "%(prog)s [--list | --all | --default]\n"
+            "%(prog)s [--list | --default]\n"
             "       %(prog)s <task> [<task> ...]\n"
             "       %(prog)s <task> -- [<arg> ...]"
         ),
@@ -200,12 +199,6 @@ def command(argv: Sequence[str]) -> Command:
     )
 
     group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "-a",
-        "--all",
-        action="store_true",
-        help="run all tasks",
-    )
     group.add_argument(
         "-d",
         "--default",
@@ -234,8 +227,6 @@ def command(argv: Sequence[str]) -> Command:
     args = parser.parse_args(head)
 
     if has_dash:
-        if args.all:
-            parser.error("'--' cannot be combined with '--all'")
         if args.default:
             parser.error("'--' cannot be combined with '--default'")
         if args.list:
@@ -248,9 +239,6 @@ def command(argv: Sequence[str]) -> Command:
                 parser.error("no task specified before '--'")
             case _:
                 parser.error("exactly one task must precede '--'")
-
-    if args.all:
-        return HarbingerFlag.ALL
 
     if args.default:
         return HarbingerFlag.DEFAULT

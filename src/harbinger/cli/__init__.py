@@ -85,13 +85,6 @@ def cli(argv: Sequence[str] | None = None) -> int:
 def execute(cmd: Command, registry: TaskRegistry, /) -> int:
     try:
         match cmd:
-            case HarbingerFlag.ALL:
-                tasks = registry.all()
-                if not tasks:
-                    console.error("no tasks found")
-                    return 2
-                run(tasks)
-
             case HarbingerFlag.DEFAULT:
                 tasks = registry.default()
                 if not tasks:
