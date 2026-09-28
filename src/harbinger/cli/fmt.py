@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import traceback
 from collections.abc import Sequence
 
@@ -75,6 +77,22 @@ def causes_of(error: HarbingerError) -> str:
             lines.append(f"       {where}")
 
     return "\n".join(lines)
+
+
+def show_causes(error: HarbingerError) -> None:
+    if causes := causes_of(error):
+        console.stderr(causes)
+
+    for cause in error.causes():
+        if (
+            isinstance(cause, subprocess.CalledProcessError)
+            and isinstance(stderr := cause.stderr, str)
+            and stderr
+        ):
+            console.stderr("[yellow]captured stderr:[/]")
+            sys.stderr.write(stderr)
+            if not stderr.endswith("\n"):
+                sys.stderr.write("\n")
 
 
 def run(tasks: Sequence[Task], /) -> None:

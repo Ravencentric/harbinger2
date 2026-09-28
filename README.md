@@ -62,15 +62,13 @@ the first failure. Repeating a name runs that task again.
 Tasks are excluded from `--default` unless you opt them in:
 
 ```python
-import subprocess
-
-from harbinger import task
+from harbinger import Command, task
 
 
 @task(default=True)
 def test() -> None:
     """Run the test suite."""
-    subprocess.run(["pytest"], check=True)
+    Command("pytest").run()
 ```
 
 `--default` runs the marked tasks in listing order, using their parameter
@@ -133,6 +131,99 @@ harbinger cp -- --recursive src dst
 
 Options may appear before or after the positional values. `*args` cannot be
 combined with other positional parameters, and `**kwargs` is not supported.
+
+## External commands
+
+`Command` builds a reusable invocation. `.run()` executes it synchronously with
+inherited stdin, stdout, and stderr. Nonzero exit statuses raise by default.
+There is no shell option or automatic command echo.
+
+```python
+from pathlib import Path
+from harbinger import Command
+
+project = Path("my project")
+uv = Command("uv").args(t"run").cwd(project)
+
+uv.args(t"pytest").run()
+uv.args(t"ruff check").args("--fix").run()
+
+paths = [Path("first file.py"), Path("second file.py")]
+Command("git").args("add", *paths).run()
+```
+
+Pass the executable as a string or path. It is a single path, so
+`Command("git status")` looks for a program named `git status`. Pass arguments
+with `.args()`: one t-string per call, or any number of literal strings and paths.
+Unpack a sequence of arguments with `*`. Literal arguments are stored as provided and
+passed to `subprocess` when the command runs; empty additions do nothing.
+
+Templates use `shlex` POSIX quoting rules on every platform. Interpolated values
+are quoted automatically before splitting, so write `{path}` without surrounding
+shell quotes. Path-like interpolations use `os.fspath()`. Prefer interpolated
+paths, especially for Windows backslashes. There is no shell expansion or
+execution; operators are ordinary arguments.
+
+```python
+Command("git").args(t'commit -m "release build"').run()
+Command("tool").args(t"--output={project / 'build files'}").run()
+
+count = 7
+Command("tool").args(t"--count={count:03d}").run()
+```
+
+Python conversions (`!s`, `!r`, `!a`) and format specifications work on
+interpolated values. Unpack a sequence when a collection should become multiple
+command arguments:
+
+```python
+flags = ["-q", "-k", "slow tests"]
+Command("pytest").args(*flags).run()
+```
+
+### Configuration and reuse
+
+Optional settings are configured through builder methods. Every method returns a
+new command; retain the return value when building conditionally.
+
+| Method | Behavior when repeated |
+| --- | --- |
+| `.args(*values)` | Append literal arguments, or parse one t-string. |
+| `.cwd(path)` | Replace the directory; the last call wins. |
+| `.env(mapping)` | Merge overrides; the last value wins for each variable. |
+| `.check(enabled)` | Replace exit checking; the default is `True`. |
+
+```python
+base = Command("pytest").env({"CI": "1", "DEBUG": "0"})
+debug = base.env({"DEBUG": "1"})
+debug.run()  # base still has DEBUG=0
+
+probe = Command("git").args(t"diff --quiet").check(False)
+result = probe.run()
+print(result.returncode)
+```
+
+Builder methods return immutable command variants: changing `debug` above does
+not change `base`. Repeated `.args()` calls append arguments; repeated `.cwd()`
+and `.check()` calls replace their settings. Repeated `.env()` calls merge
+overrides by key.
+
+By default, commands inherit the working directory and environment at execution
+time. Relative working directories also resolve then. `.cwd(None)` restores
+directory inheritance. Environment overrides never modify the parent environment;
+`None` removes a variable from the child, and an empty mapping changes nothing.
+Overrides merge by mapping key. Removing a variable does not restore inheritance
+for it.
+
+`.run()` returns an immutable `Run` with `.executable`, `.args`, and
+`.returncode`. `.args` contains only the arguments, excluding the executable.
+`.capture()` captures both output streams as UTF-8 text and returns `Capture`,
+adding `.stdout` and `.stderr`. `.stdout()` executes and returns stripped stdout;
+use `.capture().stdout` to preserve whitespace.
+Checked failures raise `subprocess.CalledProcessError`. Failures from
+`.capture()` retain captured output on the exception, and Harbinger prints
+captured stderr in its task-failure diagnostic. Launch errors such as
+`FileNotFoundError` and interruptions propagate normally.
 
 ## Errors and execution
 

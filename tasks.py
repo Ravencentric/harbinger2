@@ -1,43 +1,40 @@
 import builtins
-import subprocess
 from pathlib import Path
 from typing import Literal
 
-from harbinger import task
+from harbinger import Command, task
 
-
-def uvrun(*args: str) -> None:
-    subprocess.run(["uv", "run", *args], check=True)
+uv = Command("uv").args("run")
 
 
 @task(default=True)
 def lint(*, fix: bool = True) -> None:
     """Run the Ruff linter (optionally applying fixes)."""
     if fix:
-        uvrun("ruff", "check", "--fix")
+        uv.args(t"ruff check --fix").run()
     else:
-        uvrun("ruff", "check")
+        uv.args(t"ruff check").run()
 
 
 @task(default=True)
 def format(*, check: bool = False) -> None:
     """Format code with Ruff (or verify formatting with --check)."""
     if check:
-        uvrun("ruff", "format", ".", "--check")
+        uv.args(t"ruff format --check").run()
     else:
-        uvrun("ruff", "format", ".")
+        uv.args(t"ruff format").run()
 
 
 @task(default=True)
 def typecheck() -> None:
     """Run the Pyrefly type checker."""
-    uvrun("pyrefly", "check")
+    uv.args(t"pyrefly check").run()
 
 
 @task
 def test() -> None:
     """Run the test suite."""
-    uvrun("pytest")
+    uv.args(t"pytest").run()
 
 
 @task

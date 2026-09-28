@@ -15,7 +15,7 @@ from ..errors import (
 from ..model import TaskId
 from ..registry import TaskRegistry
 from . import console
-from .fmt import causes_of, diagnostic_for, run, show
+from .fmt import diagnostic_for, run, show, show_causes
 from .parser import (
     TASKFILE,
     Command,
@@ -74,9 +74,7 @@ def cli(argv: Sequence[str] | None = None) -> int:
 
     except HarbingerError as error:
         console.error(error.msg)
-        causes = causes_of(error)
-        if causes:
-            console.stderr(causes)
+        show_causes(error)
         return 1
 
     return execute(cmd, registry)
@@ -139,16 +137,12 @@ def execute(cmd: Command, registry: TaskRegistry, /) -> int:
 
     except TaskError as error:
         console.error(f"task [cyan]{error.id!r}[/] failed")
-        causes = causes_of(error)
-        if causes:
-            console.stderr(causes)
+        show_causes(error)
         return 1
 
     except HarbingerError as error:
         console.error(str(error))
-        causes = causes_of(error)
-        if causes:
-            console.stderr(causes)
+        show_causes(error)
         return 1
 
     return 0
