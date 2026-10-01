@@ -153,8 +153,23 @@ Command("git").args("add", *paths).run()
 ```
 
 Pass the executable as a string or path. It is a single path, so
-`Command("git status")` looks for a program named `git status`. Pass arguments
-with `.args()`: one t-string per call, or any number of literal strings and paths.
+`Command("git status")` looks for a program named `git status`. Use a bare string
+name for executable lookup or an absolute path. Raw path-like inputs must be
+absolute. Relative executable paths such as `./tool`, `../tool`, and `bin/tool`
+raise `ValueError`: their relationship to
+`.cwd()` varies by platform. Resolve local paths explicitly, for example
+`Command(Path("bin/tool").resolve())`. Path-like executables are converted with
+`os.fspath()`. Bare names are resolved through the current `PATH` during
+construction. The resolved path must point to an existing file; missing paths
+and directories raise `FileNotFoundError`. The stored path is canonical and absolute.
+
+`Executable.new(raw)` parses these rules into an immutable value that implements
+`os.PathLike[str]`. Use `str(executable)` or `os.fspath(executable)` to obtain its
+text. You can parse it separately and reuse it across commands; `Command`
+also calls `Executable.new()` for raw inputs.
+
+Pass arguments with `.args()`: one t-string per call, or any number of literal
+strings and paths.
 Unpack a sequence of arguments with `*`. Literal arguments are stored as provided and
 passed to `subprocess` when the command runs; empty additions do nothing.
 
@@ -203,20 +218,24 @@ result = probe.run()
 print(result.returncode)
 ```
 
-Builder methods return immutable command variants: changing `debug` above does
-not change `base`. Repeated `.args()` calls append arguments; repeated `.cwd()`
-and `.check()` calls replace their settings. Repeated `.env()` calls merge
-overrides by key.
+Builder methods return new command variants: deriving `debug` above does not
+change `base`. Arguments are stored in tuples and environment overrides are
+copied from the supplied mappings. Repeated `.args()` calls append arguments;
+repeated `.cwd()` and `.check()` calls replace their settings. Repeated `.env()`
+calls merge overrides by key.
 
 By default, commands inherit the working directory and environment at execution
 time. Relative working directories also resolve then. `.cwd(None)` restores
 directory inheritance. Environment overrides never modify the parent environment;
 `None` removes a variable from the child, and an empty mapping changes nothing.
-Overrides merge by mapping key. Removing a variable does not restore inheritance
-for it.
+Variable names are case-insensitive on Windows and case-sensitive elsewhere.
+Removing a variable does not restore inheritance for it.
 
 `.run()` returns an immutable `Run` with `.executable`, `.args`, and
-`.returncode`. `.args` contains only the arguments, excluding the executable.
+`.returncode`. `.executable` is the parsed `Executable` supplied to `subprocess`,
+which supports `os.fspath()` and `str()`.
+`.args` is a tuple of strings containing the arguments passed to the child,
+excluding the executable. Path-like arguments are converted at execution time.
 `.capture()` captures both output streams as UTF-8 text and returns `Capture`,
 adding `.stdout` and `.stderr`. `.stdout()` executes and returns stripped stdout;
 use `.capture().stdout` to preserve whitespace.

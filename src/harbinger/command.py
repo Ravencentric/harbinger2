@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import subprocess
 from collections.abc import Mapping
 from copy import copy
@@ -11,6 +12,85 @@ from string.templatelib import Interpolation, Template, convert
 from typing import Sequence, final, overload, override
 
 type StrOrPath = str | os.PathLike[str]
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class Executable(os.PathLike[str]):
+    """The canonical absolute path to an existing executable file."""
+
+    _: str
+
+    @classmethod
+    def new(cls, value: str | os.PathLike[str], /) -> Executable:
+        match value:
+            case str():
+                if os.path.isabs(value):
+                    program = value
+                elif value not in ("", ".", "..") and os.path.basename(value) == value:
+                    program = shutil.which(value)
+                    if program is None:
+                        raise FileNotFoundError(value)
+                else:
+                    raise ValueError
+
+            case os.PathLike():
+                program = os.fspath(value)
+
+                if not os.path.isabs(program):
+                    raise ValueError
+
+            case _:
+                raise TypeError
+
+        if not os.path.isfile(program):
+            raise FileNotFoundError(program)
+
+        return cls(os.path.realpath(program))
+
+    def __fspath__(self) -> str:
+        return self._
+
+    def __str__(self) -> str:
+        return self._
+
+    def __repr__(self) -> str:
+        return f"Executable({self._!r})"
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class Environment:
+    """Environment overrides, with None marking a variable for removal."""
+
+    _: Mapping[str, str | None]
+
+    @classmethod
+    def new(cls, values: Mapping[str, str | None], /) -> Environment:
+        return cls(
+            {
+                key.upper() if os.name == "nt" else key: value
+                for key, value in values.items()
+            }
+        )
+
+    def merge(self, values: Mapping[str, str | None], /) -> Environment:
+        overrides = Environment.new(values)
+        return Environment({**self._, **overrides._})
+
+    def overlay(self, parent: Mapping[str, str], /) -> dict[str, str]:
+        result = {
+            key.upper() if os.name == "nt" else key: value
+            for key, value in parent.items()
+        }
+
+        for key, value in self._.items():
+            if value is None:
+                result.pop(key, None)
+            else:
+                result[key] = value
+
+        return result
 
 
 def t2seq(template: Template) -> tuple[str, ...]:
@@ -46,18 +126,12 @@ def args2seq(args: Sequence[StrOrPath | Template]) -> tuple[StrOrPath, ...]:
             return tuple(seq)
 
 
-def replace(cmd: Command, key: str, value: object) -> Command:
-    copied = copy(cmd)
-    object.__setattr__(copied, key, value)
-    return copied
-
-
 @dataclass(frozen=True, slots=True)
 class Run:
     """The executable, arguments, and exit status of a completed command."""
 
-    executable: Path
-    args: tuple[StrOrPath, ...]
+    executable: Executable
+    args: tuple[str, ...]
     returncode: int
 
 
@@ -71,20 +145,21 @@ class Capture(Run):
 
 
 @final
-@dataclass(frozen=True, slots=True, init=False, repr=False)
 class Command:
-    _executable: Path
+    __slots__ = ("_executable", "_args", "_cwd", "_env", "_check")
+
+    _executable: Executable
     _args: tuple[StrOrPath, ...]
     _cwd: Path | None
-    _env: Mapping[str, str | None]
+    _env: Environment
     _check: bool
 
-    def __init__(self, executable: StrOrPath, /) -> None:
-        object.__setattr__(self, "_executable", Path(executable))
-        object.__setattr__(self, "_args", ())
-        object.__setattr__(self, "_cwd", None)
-        object.__setattr__(self, "_env", {})
-        object.__setattr__(self, "_check", True)
+    def __init__(self, executable: str | os.PathLike[str], /) -> None:
+        self._executable = Executable.new(executable)
+        self._args = ()
+        self._cwd = None
+        self._env = Environment.new({})
+        self._check = True
 
     @override
     def __repr__(self) -> str:
@@ -97,56 +172,48 @@ class Command:
     def args(self, args: Template, /) -> Command: ...
 
     @overload
-    def args(self, *args: StrOrPath) -> Command: ...
+    def args(self, *args: str | os.PathLike[str]) -> Command: ...
 
-    def args(self, *args: StrOrPath | Template) -> Command:
-        return replace(self, "_args", self._args + args2seq(args))
+    def args(self, *args: str | os.PathLike[str] | Template) -> Command:
+        command = copy(self)
+        command._args = self._args + args2seq(args)
+        return command
 
-    def cwd(self, path: StrOrPath | None, /) -> Command:
-        return replace(
-            self,
-            "_cwd",
-            Path(path) if path is not None else None,
-        )
+    def cwd(self, path: str | os.PathLike[str] | None, /) -> Command:
+        command = copy(self)
+        command._cwd = Path(path) if path is not None else None
+        return command
 
     def env(self, overrides: Mapping[str, str | None], /) -> Command:
-        return replace(self, "_env", {**self._env, **overrides})
+        command = copy(self)
+        command._env = self._env.merge(overrides)
+        return command
 
     def check(self, enabled: bool, /) -> Command:
-        return replace(self, "_check", enabled)
+        command = copy(self)
+        command._check = enabled
+        return command
 
     def run(self) -> Run:
-        args = (self._executable, *self._args)
-        env = dict(os.environ)
-
-        for key, value in self._env.items():
-            if value is None:
-                env.pop(key, None)
-            else:
-                env[key] = value
+        args = tuple(os.fspath(arg) for arg in self._args)
+        env = self._env.overlay(os.environ)
 
         completed = subprocess.run(
-            args,
+            (self._executable, *args),
             cwd=self._cwd,
             env=env,
             check=self._check,
             shell=False,
         )
 
-        return Run(self._executable, self._args, completed.returncode)
+        return Run(self._executable, args, completed.returncode)
 
     def capture(self) -> Capture:
-        args = (self._executable, *self._args)
-        env = dict(os.environ)
-
-        for key, value in self._env.items():
-            if value is None:
-                env.pop(key, None)
-            else:
-                env[key] = value
+        args = tuple(os.fspath(arg) for arg in self._args)
+        env = self._env.overlay(os.environ)
 
         completed = subprocess.run(
-            args,
+            (self._executable, *args),
             cwd=self._cwd,
             env=env,
             capture_output=True,
@@ -157,7 +224,7 @@ class Command:
 
         return Capture(
             self._executable,
-            self._args,
+            args,
             completed.returncode,
             completed.stdout,
             completed.stderr,
