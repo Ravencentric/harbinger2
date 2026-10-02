@@ -9,9 +9,10 @@ from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from string.templatelib import Interpolation, Template, convert
-from typing import Sequence, final, overload, override
+from typing import NewType, Sequence, final, overload, override
 
 type StrOrPath = str | os.PathLike[str]
+Args = NewType("Args", tuple[str, ...])
 
 
 @final
@@ -45,42 +46,7 @@ class Executable(os.PathLike[str]):
         return f"Executable({self._!r})"
 
 
-@final
-@dataclass(frozen=True, slots=True)
-class Environment:
-    """Environment overrides, with None marking a variable for removal."""
-
-    _: Mapping[str, str | None]
-
-    @classmethod
-    def new(cls, values: Mapping[str, str | None], /) -> Environment:
-        return cls(
-            {
-                key.upper() if os.name == "nt" else key: value
-                for key, value in values.items()
-            }
-        )
-
-    def merge(self, values: Mapping[str, str | None], /) -> Environment:
-        overrides = Environment.new(values)
-        return Environment({**self._, **overrides._})
-
-    def overlay(self, parent: Mapping[str, str], /) -> dict[str, str]:
-        result = {
-            key.upper() if os.name == "nt" else key: value
-            for key, value in parent.items()
-        }
-
-        for key, value in self._.items():
-            if value is None:
-                result.pop(key, None)
-            else:
-                result[key] = value
-
-        return result
-
-
-def t2seq(template: Template) -> tuple[str, ...]:
+def template2args(template: Template) -> Args:
     parts: list[str] = []
 
     for item in template:
@@ -95,22 +61,22 @@ def t2seq(template: Template) -> tuple[str, ...]:
                 value = format(value, format_spec)
                 parts.append(shlex.quote(value))
 
-    return tuple(shlex.split("".join(parts)))
+    return Args(shlex.split("".join(parts)))
 
 
-def args2seq(args: Sequence[StrOrPath | Template]) -> tuple[StrOrPath, ...]:
+def seq2args(args: Sequence[StrOrPath | Template]) -> Args:
     match args:
         case []:
-            return ()
+            return Args()
         case [Template() as template]:
-            return t2seq(template)
+            return template2args(template)
         case _:
             seq: list[StrOrPath] = []
             for arg in args:
                 if isinstance(arg, Template):
                     raise TypeError("a t-string cannot be mixed with other arguments")
-                seq.append(arg)
-            return tuple(seq)
+                seq.append(os.fspath(arg))
+            return Args(seq)
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +84,7 @@ class Run:
     """The executable, arguments, and exit status of a completed command."""
 
     executable: Executable
-    args: tuple[str, ...]
+    args: Args
     returncode: int
 
 
@@ -137,9 +103,9 @@ class Command:
 
     def __init__(self, executable: StrOrPath, /) -> None:
         self._executable: Executable = Executable.new(executable)
-        self._args: tuple[str, ...] = ()
+        self._args: Args = Args()
         self._cwd: Path | None = None
-        self._env: Environment | None = None
+        self._env: Mapping[str, str] = {}
         self._check: bool = True
 
     @override
@@ -157,7 +123,7 @@ class Command:
 
     def args(self, *args: StrOrPath | Template) -> Command:
         command = copy(self)
-        command._args = self._args + args2seq(args)
+        command._args = self._args + seq2args(args)
         return command
 
     def cwd(self, path: StrOrPath | None, /) -> Command:
@@ -165,9 +131,9 @@ class Command:
         command._cwd = Path(path) if path is not None else None
         return command
 
-    def env(self, overrides: Mapping[str, str | None], /) -> Command:
+    def env(self, overrides: Mapping[str, str], /) -> Command:
         command = copy(self)
-        command._env = self._env.merge(overrides)
+        command._env = {**self._env, **overrides}
         return command
 
     def check(self, enabled: bool, /) -> Command:
@@ -176,25 +142,23 @@ class Command:
         return command
 
     def run(self) -> Run:
-        args = tuple(os.fspath(arg) for arg in self._args)
-        env = self._env.overlay(os.environ)
+        env = {**os.environ, **self._env}
 
         completed = subprocess.run(
-            (self._executable, *args),
+            (self._executable, *self._args),
             cwd=self._cwd,
             env=env,
             check=self._check,
             shell=False,
         )
 
-        return Run(self._executable, args, completed.returncode)
+        return Run(self._executable, self._args, completed.returncode)
 
     def capture(self) -> Capture:
-        args = tuple(os.fspath(arg) for arg in self._args)
-        env = self._env.overlay(os.environ)
+        env = {**os.environ, **self._env}
 
         completed = subprocess.run(
-            (self._executable, *args),
+            (self._executable, *self._args),
             cwd=self._cwd,
             env=env,
             capture_output=True,
@@ -205,7 +169,7 @@ class Command:
 
         return Capture(
             self._executable,
-            args,
+            self._args,
             completed.returncode,
             completed.stdout,
             completed.stderr,
