@@ -22,31 +22,18 @@ class Executable(os.PathLike[str]):
     _: str
 
     @classmethod
-    def new(cls, value: str | os.PathLike[str], /) -> Executable:
-        match value:
-            case str():
-                if os.path.isabs(value):
-                    program = value
-                elif value not in ("", ".", "..") and os.path.basename(value) == value:
-                    program = shutil.which(value)
-                    if program is None:
-                        raise FileNotFoundError(value)
-                else:
-                    raise ValueError
+    def new(cls, value: StrOrPath, /) -> Executable:
+        program = os.fspath(value)
 
-            case os.PathLike():
-                program = os.fspath(value)
+        if os.path.isabs(program):
+            if os.path.isfile(program):
+                return cls(os.path.realpath(program))
 
-                if not os.path.isabs(program):
-                    raise ValueError
+        if program not in ("", ".", "..") and os.path.basename(program) == program:
+            if found := shutil.which(program):
+                return cls(os.path.realpath(found))
 
-            case _:
-                raise TypeError
-
-        if not os.path.isfile(program):
-            raise FileNotFoundError(program)
-
-        return cls(os.path.realpath(program))
+        raise FileNotFoundError(program)
 
     def __fspath__(self) -> str:
         return self._
@@ -148,18 +135,12 @@ class Capture(Run):
 class Command:
     __slots__ = ("_executable", "_args", "_cwd", "_env", "_check")
 
-    _executable: Executable
-    _args: tuple[StrOrPath, ...]
-    _cwd: Path | None
-    _env: Environment
-    _check: bool
-
-    def __init__(self, executable: str | os.PathLike[str], /) -> None:
-        self._executable = Executable.new(executable)
-        self._args = ()
-        self._cwd = None
-        self._env = Environment.new({})
-        self._check = True
+    def __init__(self, executable: StrOrPath, /) -> None:
+        self._executable: Executable = Executable.new(executable)
+        self._args: tuple[str, ...] = ()
+        self._cwd: Path | None = None
+        self._env: Environment | None = None
+        self._check: bool = True
 
     @override
     def __repr__(self) -> str:
@@ -172,14 +153,14 @@ class Command:
     def args(self, args: Template, /) -> Command: ...
 
     @overload
-    def args(self, *args: str | os.PathLike[str]) -> Command: ...
+    def args(self, *args: StrOrPath) -> Command: ...
 
-    def args(self, *args: str | os.PathLike[str] | Template) -> Command:
+    def args(self, *args: StrOrPath | Template) -> Command:
         command = copy(self)
         command._args = self._args + args2seq(args)
         return command
 
-    def cwd(self, path: str | os.PathLike[str] | None, /) -> Command:
+    def cwd(self, path: StrOrPath | None, /) -> Command:
         command = copy(self)
         command._cwd = Path(path) if path is not None else None
         return command
