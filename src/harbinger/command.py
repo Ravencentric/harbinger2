@@ -64,7 +64,7 @@ def template2args(template: Template) -> Args:
     return Args(shlex.split("".join(parts)))
 
 
-def seq2args(args: Sequence[StrOrPath | Template]) -> Args:
+def sequence2args(args: Sequence[StrOrPath | Template]) -> Args:
     match args:
         case []:
             return Args()
@@ -83,8 +83,8 @@ def seq2args(args: Sequence[StrOrPath | Template]) -> Args:
 class Run:
     """The executable, arguments, and exit status of a completed command."""
 
-    executable: Executable
-    args: Args
+    executable: str
+    args: tuple[str, ...]
     returncode: int
 
 
@@ -123,7 +123,7 @@ class Command:
 
     def args(self, *args: StrOrPath | Template) -> Command:
         command = copy(self)
-        command._args = self._args + seq2args(args)
+        command._args = self._args + sequence2args(args)
         return command
 
     def cwd(self, path: StrOrPath | None, /) -> Command:
@@ -142,12 +142,11 @@ class Command:
         return command
 
     def run(self) -> Run:
-        env = {**os.environ, **self._env}
 
         completed = subprocess.run(
             (self._executable, *self._args),
             cwd=self._cwd,
-            env=env,
+            env={**os.environ, **self._env},
             check=self._check,
             shell=False,
         )
@@ -155,12 +154,11 @@ class Command:
         return Run(self._executable, self._args, completed.returncode)
 
     def capture(self) -> Capture:
-        env = {**os.environ, **self._env}
 
         completed = subprocess.run(
             (self._executable, *self._args),
             cwd=self._cwd,
-            env=env,
+            env={**os.environ, **self._env},
             capture_output=True,
             encoding="utf-8",
             check=self._check,
@@ -168,7 +166,7 @@ class Command:
         )
 
         return Capture(
-            self._executable,
+            f"{self._executable}",
             self._args,
             completed.returncode,
             completed.stdout,
