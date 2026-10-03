@@ -9,10 +9,9 @@ from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from string.templatelib import Interpolation, Template, convert
-from typing import NewType, Sequence, final, overload, override
+from typing import Sequence, final, overload, override
 
 type StrOrPath = str | os.PathLike[str]
-Args = NewType("Args", tuple[str, ...])
 
 
 @final
@@ -36,17 +35,20 @@ class Executable(os.PathLike[str]):
 
         raise FileNotFoundError(program)
 
+    @override
     def __fspath__(self) -> str:
         return self._
 
+    @override
     def __str__(self) -> str:
         return self._
 
+    @override
     def __repr__(self) -> str:
         return f"Executable({self._!r})"
 
 
-def template2args(template: Template) -> Args:
+def template2args(template: Template) -> tuple[str, ...]:
     parts: list[str] = []
 
     for item in template:
@@ -61,22 +63,22 @@ def template2args(template: Template) -> Args:
                 value = format(value, format_spec)
                 parts.append(shlex.quote(value))
 
-    return Args(shlex.split("".join(parts)))
+    return tuple(shlex.split("".join(parts)))
 
 
-def sequence2args(args: Sequence[StrOrPath | Template]) -> Args:
+def sequence2args(args: Sequence[StrOrPath | Template]) -> tuple[str, ...]:
     match args:
         case []:
-            return Args()
+            return ()
         case [Template() as template]:
             return template2args(template)
         case _:
-            seq: list[StrOrPath] = []
+            seq: list[str] = []
             for arg in args:
                 if isinstance(arg, Template):
                     raise TypeError("a t-string cannot be mixed with other arguments")
                 seq.append(os.fspath(arg))
-            return Args(seq)
+            return tuple(seq)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +105,7 @@ class Command:
 
     def __init__(self, executable: StrOrPath, /) -> None:
         self._executable: Executable = Executable.new(executable)
-        self._args: Args = Args()
+        self._args: tuple[str, ...] = ()
         self._cwd: Path | None = None
         self._env: Mapping[str, str] = {}
         self._check: bool = True
@@ -151,7 +153,7 @@ class Command:
             shell=False,
         )
 
-        return Run(self._executable, self._args, completed.returncode)
+        return Run(str(self._executable), self._args, completed.returncode)
 
     def capture(self) -> Capture:
 
@@ -166,7 +168,7 @@ class Command:
         )
 
         return Capture(
-            f"{self._executable}",
+            str(self._executable),
             self._args,
             completed.returncode,
             completed.stdout,

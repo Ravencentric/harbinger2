@@ -153,25 +153,20 @@ Command("git").args("add", *paths).run()
 ```
 
 Pass the executable as a string or path. It is a single path, so
-`Command("git status")` looks for a program named `git status`. Use a bare string
-name for executable lookup or an absolute path. Raw path-like inputs must be
-absolute. Relative executable paths such as `./tool`, `../tool`, and `bin/tool`
-raise `ValueError`: their relationship to
-`.cwd()` varies by platform. Resolve local paths explicitly, for example
-`Command(Path("bin/tool").resolve())`. Path-like executables are converted with
-`os.fspath()`. Bare names are resolved through the current `PATH` during
-construction. The resolved path must point to an existing file; missing paths
-and directories raise `FileNotFoundError`. The stored path is canonical and absolute.
-
-`Executable.new(raw)` parses these rules into an immutable value that implements
-`os.PathLike[str]`. Use `str(executable)` or `os.fspath(executable)` to obtain its
-text. You can parse it separately and reuse it across commands; `Command`
-also calls `Executable.new()` for raw inputs.
+`Command("git status")` looks for a program named `git status`. Path-like inputs
+are converted with `os.fspath()` and follow the same rules as strings. Bare names,
+including `Path("git")`, are resolved through the current `PATH` during
+construction. Absolute paths must point to an existing file. Relative executable
+paths such as `./tool`, `../tool`, and `bin/tool` raise `FileNotFoundError`.
+Resolve local paths explicitly, for example
+`Command(Path("bin/tool").resolve())`. Missing programs and directories also
+raise `FileNotFoundError`. The stored path is canonical and absolute.
 
 Pass arguments with `.args()`: one t-string per call, or any number of literal
 strings and paths.
-Unpack a sequence of arguments with `*`. Literal arguments are stored as provided and
-passed to `subprocess` when the command runs; empty additions do nothing.
+Unpack a sequence of arguments with `*`. Literal strings are stored unchanged;
+path-like arguments are converted with `os.fspath()` when `.args()` is called.
+The resulting strings are fixed for every execution. Empty additions do nothing.
 
 Templates use `shlex` POSIX quoting rules on every platform. Interpolated values
 are quoted automatically before splitting, so write `{path}` without surrounding
@@ -205,7 +200,7 @@ new command; retain the return value when building conditionally.
 | --- | --- |
 | `.args(*values)` | Append literal arguments, or parse one t-string. |
 | `.cwd(path)` | Replace the directory; the last call wins. |
-| `.env(mapping)` | Merge overrides; the last value wins for each variable. |
+| `.env(mapping)` | Merge string overrides; later values replace identical keys. |
 | `.check(enabled)` | Replace exit checking; the default is `True`. |
 
 ```python
@@ -222,20 +217,19 @@ Builder methods return new command variants: deriving `debug` above does not
 change `base`. Arguments are stored in tuples and environment overrides are
 copied from the supplied mappings. Repeated `.args()` calls append arguments;
 repeated `.cwd()` and `.check()` calls replace their settings. Repeated `.env()`
-calls merge overrides by key.
+calls merge dictionaries by key.
 
-By default, commands inherit the working directory and environment at execution
-time. Relative working directories also resolve then. `.cwd(None)` restores
-directory inheritance. Environment overrides never modify the parent environment;
-`None` removes a variable from the child, and an empty mapping changes nothing.
-Variable names are case-insensitive on Windows and case-sensitive elsewhere.
-Removing a variable does not restore inheritance for it.
+Commands inherit the parent environment at execution time, with `.env()` string
+overrides applied on top. Overrides never modify the parent environment, and an
+empty mapping changes nothing. By default, commands also inherit the working
+directory. Relative working directories resolve at execution time, and
+`.cwd(None)` restores directory inheritance.
 
 `.run()` returns an immutable `Run` with `.executable`, `.args`, and
-`.returncode`. `.executable` is the parsed `Executable` supplied to `subprocess`,
-which supports `os.fspath()` and `str()`.
+`.returncode`. `.executable` is the canonical absolute executable path as a string.
 `.args` is a tuple of strings containing the arguments passed to the child,
-excluding the executable. Path-like arguments are converted at execution time.
+excluding the executable. Path-like arguments were converted when added to the
+command.
 `.capture()` captures both output streams as UTF-8 text and returns `Capture`,
 adding `.stdout` and `.stderr`. `.stdout()` executes and returns stripped stdout;
 use `.capture().stdout` to preserve whitespace.
