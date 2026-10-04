@@ -17,6 +17,8 @@ def public_api(path: Path) -> None:
     assert_type(command.cwd(path).cwd(None), Command)
     assert_type(command.env({"A": "1", "B": "2"}), Command)
     assert_type(command.check(False), Command)
+    assert_type(command == Command(path), bool)
+    assert_type(hash(command), int)
     assert_type(command.run(), Run)
     assert_type(command.run().executable, str)
     assert_type(command.run().args, tuple[str, ...])

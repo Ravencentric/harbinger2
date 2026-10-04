@@ -156,11 +156,13 @@ Pass the executable as a string or path. It is a single path, so
 `Command("git status")` looks for a program named `git status`. Path-like inputs
 are converted with `os.fspath()` and follow the same rules as strings. Bare names,
 including `Path("git")`, are resolved through the current `PATH` during
-construction. Absolute paths must point to an existing file. Relative executable
-paths such as `./tool`, `../tool`, and `bin/tool` raise `FileNotFoundError`.
+construction. Absolute paths that do not point to an existing file, empty names,
+and relative executable paths such as
+`./tool`, `../tool`, and `bin/tool` raise `ValueError`.
 Resolve local paths explicitly, for example
-`Command(Path("bin/tool").resolve())`. Missing programs and directories also
-raise `FileNotFoundError`. The stored path is canonical and absolute.
+`Command(Path("bin/tool").resolve())`. Bare names absent from `PATH` raise
+`FileNotFoundError`.
+The stored path is canonical and absolute.
 
 Pass arguments with `.args()`: one t-string per call, or any number of literal
 strings and paths.
@@ -218,6 +220,13 @@ change `base`. Arguments are stored in tuples and environment overrides are
 copied from the supplied mappings. Repeated `.args()` calls append arguments;
 repeated `.cwd()` and `.check()` calls replace their settings. Repeated `.env()`
 calls merge dictionaries by key.
+
+Commands compare by their configured executable, arguments, working directory,
+environment overrides, and exit checking. Equivalent commands have equal hashes
+and can be used as dictionary keys or set members. The insertion order of
+environment overrides does not affect equality. On Windows, override names are
+normalized to uppercase, so casing does not affect merging or equality. On other
+platforms, names remain case sensitive.
 
 Commands inherit the parent environment at execution time, with `.env()` string
 overrides applied on top. Overrides never modify the parent environment, and an

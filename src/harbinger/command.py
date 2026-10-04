@@ -5,11 +5,10 @@ import shlex
 import shutil
 import subprocess
 from collections.abc import Mapping
-from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from string.templatelib import Interpolation, Template, convert
-from typing import Sequence, final, overload, override
+from typing import Any, Sequence, final, overload, override
 
 type StrOrPath = str | os.PathLike[str]
 
@@ -19,68 +18,110 @@ type StrOrPath = str | os.PathLike[str]
 class Executable(os.PathLike[str]):
     """The canonical absolute path to an existing executable file."""
 
-    _: str
+    inner: str
 
     @classmethod
-    def new(cls, value: StrOrPath, /) -> Executable:
+    def parse(cls, value: StrOrPath, /) -> Executable:
         program = os.fspath(value)
 
-        if os.path.isabs(program):
-            if os.path.isfile(program):
-                return cls(os.path.realpath(program))
+        if not program:
+            raise ValueError("executable cannot be empty")
 
-        if program not in ("", ".", "..") and os.path.basename(program) == program:
-            if found := shutil.which(program):
-                return cls(os.path.realpath(found))
+        if os.path.isabs(program):
+            if not os.path.isfile(program):
+                raise ValueError(f"executable must be an existing file: {program!r}")
+            return cls(os.path.realpath(program))
+
+        if program in (".", "..") or os.path.basename(program) != program:
+            raise ValueError(
+                f"executable must be an absolute path or bare name: {program!r}"
+            )
+
+        if found := shutil.which(program):
+            return cls(os.path.realpath(found))
 
         raise FileNotFoundError(program)
 
     @override
     def __fspath__(self) -> str:
-        return self._
+        return self.inner
 
     @override
     def __str__(self) -> str:
-        return self._
-
-    @override
-    def __repr__(self) -> str:
-        return f"Executable({self._!r})"
+        return self.inner
 
 
-def template2args(template: Template) -> tuple[str, ...]:
-    parts: list[str] = []
+@final
+@dataclass(frozen=True, slots=True)
+class Arguments:
+    inner: tuple[str, ...] = ()
 
-    for item in template:
-        match item:
-            case str():
-                parts.append(item)
+    @classmethod
+    def parse(cls, args: Sequence[StrOrPath | Template] = (), /) -> Arguments:
+        match args:
+            case []:
+                return cls()
+            case [Template() as template]:
+                return cls.from_template(template)
+            case _:
+                seq: list[str] = []
 
-            case Interpolation(value, _, conversion, format_spec):
-                if isinstance(value, os.PathLike):
-                    value = os.fspath(value)
-                value = convert(value, conversion)
-                value = format(value, format_spec)
-                parts.append(shlex.quote(value))
+                for arg in args:
+                    if isinstance(arg, Template):
+                        raise TypeError(
+                            "a t-string cannot be mixed with other arguments"
+                        )
 
-    return tuple(shlex.split("".join(parts)))
+                    seq.append(os.fspath(arg))
+
+                return cls(tuple(seq))
+
+    def concat(self, args: Sequence[StrOrPath | Template], /) -> Arguments:
+        other = Arguments.parse(args)
+        return Arguments(self.inner + other.inner)
+
+    @classmethod
+    def from_template(cls, template: Template) -> Arguments:
+        parts: list[str] = []
+
+        for item in template:
+            match item:
+                case str():
+                    parts.append(item)
+
+                case Interpolation(value, _, conversion, format_spec):
+                    if isinstance(value, os.PathLike):
+                        value = os.fspath(value)
+                    value = convert(value, conversion)
+                    value = format(value, format_spec)
+                    parts.append(shlex.quote(value))
+
+        return cls(tuple(shlex.split("".join(parts))))
 
 
-def sequence2args(args: Sequence[StrOrPath | Template]) -> tuple[str, ...]:
-    match args:
-        case []:
-            return ()
-        case [Template() as template]:
-            return template2args(template)
-        case _:
-            seq: list[str] = []
-            for arg in args:
-                if isinstance(arg, Template):
-                    raise TypeError("a t-string cannot be mixed with other arguments")
-                seq.append(os.fspath(arg))
-            return tuple(seq)
+@final
+@dataclass(frozen=True, slots=True)
+class Environment:
+    inner: frozenset[tuple[str, str]] = frozenset()
+
+    @classmethod
+    def parse(cls, overrides: Mapping[str, str], /) -> Environment:
+        if os.name == "nt":
+            # Environment keys on Windows are case-insensitive
+            # but conventionally upper case
+            overrides = {name.upper(): value for name, value in overrides.items()}
+        return cls(frozenset(overrides.items()))
+
+    def merge(self, overrides: Mapping[str, str], /) -> Environment:
+        incoming = Environment.parse(overrides)
+        environment = {**dict(self.inner), **dict(incoming.inner)}
+        return Environment(frozenset(environment.items()))
+
+    def inherit(self) -> Mapping[str, str]:
+        return {**os.environ, **dict(self.inner)}
 
 
+@final
 @dataclass(frozen=True, slots=True)
 class Run:
     """The executable, arguments, and exit status of a completed command."""
@@ -92,29 +133,42 @@ class Run:
 
 @final
 @dataclass(frozen=True, slots=True)
-class Capture(Run):
+class Capture:
     """A completed command with captured stdout and stderr."""
 
+    executable: str
+    args: tuple[str, ...]
+    returncode: int
     stdout: str
     stderr: str
 
 
 @final
+@dataclass(frozen=True, slots=True)
+class State:
+    """The parsed configuration of a command."""
+
+    executable: Executable
+    args: Arguments = Arguments()
+    cwd: Path | None = None
+    env: Environment = Environment()
+    check: bool = True
+
+
+@final
+@dataclass(frozen=True, slots=True, init=False)
 class Command:
-    __slots__ = ("_executable", "_args", "_cwd", "_env", "_check")
+    inner: State
 
     def __init__(self, executable: StrOrPath, /) -> None:
-        self._executable: Executable = Executable.new(executable)
-        self._args: tuple[str, ...] = ()
-        self._cwd: Path | None = None
-        self._env: Mapping[str, str] = {}
-        self._check: bool = True
+        object.__setattr__(self, "inner", State(Executable.parse(executable)))
 
     @override
     def __repr__(self) -> str:
+        state = self.inner
         return (
-            f"<Command(executable={self._executable!r}, args={self._args!r}, "
-            f"cwd={self._cwd!r}, env={self._env!r}, check={self._check!r})>"
+            f"<Command(executable={state.executable!r}, args={state.args.inner!r}, "
+            f"cwd={state.cwd!r}, env={dict(sorted(state.env.inner))!r}, check={state.check!r})>"
         )
 
     @overload
@@ -124,52 +178,44 @@ class Command:
     def args(self, *args: StrOrPath) -> Command: ...
 
     def args(self, *args: StrOrPath | Template) -> Command:
-        command = copy(self)
-        command._args = self._args + sequence2args(args)
-        return command
+        return command(self, args=self.inner.args.concat(args))
 
     def cwd(self, path: StrOrPath | None, /) -> Command:
-        command = copy(self)
-        command._cwd = Path(path) if path is not None else None
-        return command
+        return command(self, cwd=Path(path) if path is not None else None)
 
     def env(self, overrides: Mapping[str, str], /) -> Command:
-        command = copy(self)
-        command._env = {**self._env, **overrides}
-        return command
+        return command(self, env=self.inner.env.merge(overrides))
 
     def check(self, enabled: bool, /) -> Command:
-        command = copy(self)
-        command._check = enabled
-        return command
+        return command(self, check=enabled)
 
     def run(self) -> Run:
-
+        state = self.inner
         completed = subprocess.run(
-            (self._executable, *self._args),
-            cwd=self._cwd,
-            env={**os.environ, **self._env},
-            check=self._check,
+            (state.executable, *state.args.inner),
+            cwd=state.cwd,
+            env=state.env.inherit(),
+            check=state.check,
             shell=False,
         )
 
-        return Run(str(self._executable), self._args, completed.returncode)
+        return Run(state.executable.inner, state.args.inner, completed.returncode)
 
     def capture(self) -> Capture:
-
+        state = self.inner
         completed = subprocess.run(
-            (self._executable, *self._args),
-            cwd=self._cwd,
-            env={**os.environ, **self._env},
+            (state.executable, *state.args.inner),
+            cwd=state.cwd,
+            env=state.env.inherit(),
             capture_output=True,
             encoding="utf-8",
-            check=self._check,
+            check=state.check,
             shell=False,
         )
 
         return Capture(
-            str(self._executable),
-            self._args,
+            state.executable.inner,
+            state.args.inner,
             completed.returncode,
             completed.stdout,
             completed.stderr,
@@ -177,3 +223,9 @@ class Command:
 
     def stdout(self) -> str:
         return self.capture().stdout.strip()
+
+
+def command(source: Command, /, **changes: Any) -> Command:
+    result = object.__new__(Command)
+    object.__setattr__(result, "inner", replace(source.inner, **changes))
+    return result

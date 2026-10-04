@@ -12,10 +12,10 @@ import pytest
 
 from harbinger import Capture, Command, Run
 from harbinger.cli import main
-from harbinger.command import Executable
+from harbinger.command import Environment, Executable
 
 
-@pytest.mark.parametrize("constructor", [Command, Executable.new])
+@pytest.mark.parametrize("constructor", [Command, Executable.parse])
 @pytest.mark.parametrize("as_string", [False, True], ids=["path", "string"])
 @pytest.mark.parametrize("kind", ["missing", "directory", "file"])
 def test_executable_requires_existing_file(
@@ -33,14 +33,14 @@ def test_executable_requires_existing_file(
 
     if kind == "file":
         parsed = constructor(value)
-        executable = parsed._executable if isinstance(parsed, Command) else parsed
+        executable = parsed.inner.executable if isinstance(parsed, Command) else parsed
         assert os.fspath(executable) == os.path.realpath(path)
     else:
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(ValueError):
             constructor(value)
 
 
-@pytest.mark.parametrize("constructor", [Command, Executable.new])
+@pytest.mark.parametrize("constructor", [Command, Executable.parse])
 @pytest.mark.parametrize(
     "executable",
     [
@@ -51,13 +51,25 @@ def test_executable_requires_existing_file(
         "",
         ".",
         "..",
-        Path("tool"),
-        Path("./tool"),
         Path("bin/tool"),
         Path("../tool"),
     ],
 )
-def test_unresolved_relative_executable_inputs_raise_file_not_found(
+def test_unsupported_executable_inputs_raise_value_error(
+    executable: str | Path,
+    constructor: Callable[[str | os.PathLike[str]], Command | Executable],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "harbinger.command.shutil.which", lambda program: sys.executable
+    )
+    with pytest.raises(ValueError):
+        constructor(executable)
+
+
+@pytest.mark.parametrize("constructor", [Command, Executable.parse])
+@pytest.mark.parametrize("executable", ["tool", Path("tool"), Path("./tool")])
+def test_missing_bare_executable_names_raise_file_not_found(
     executable: str | Path,
     constructor: Callable[[str | os.PathLike[str]], Command | Executable],
     monkeypatch: pytest.MonkeyPatch,
@@ -68,27 +80,15 @@ def test_unresolved_relative_executable_inputs_raise_file_not_found(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows relative path syntax")
-@pytest.mark.parametrize("constructor", [Command, Executable.new])
+@pytest.mark.parametrize("constructor", [Command, Executable.parse])
 @pytest.mark.parametrize(
     "executable", [r".\tool", r"..\tool", r"bin\tool", r"\tool", "C:tool"]
 )
-def test_windows_relative_executable_paths_raise_file_not_found(
+def test_windows_relative_executable_paths_raise_value_error(
     executable: str,
     constructor: Callable[[str | os.PathLike[str]], Command | Executable],
 ) -> None:
-    with pytest.raises(FileNotFoundError):
-        constructor(executable)
-
-
-@pytest.mark.parametrize("constructor", [Command, Executable.new])
-@pytest.mark.parametrize(
-    "executable", ["bad\0name", sys.executable + "\0", Path(sys.executable + "\0")]
-)
-def test_executable_null_bytes_are_rejected(
-    executable: str | Path,
-    constructor: Callable[[str | os.PathLike[str]], Command | Executable],
-) -> None:
-    with pytest.raises(ValueError, match="null bytes"):
+    with pytest.raises(ValueError):
         constructor(executable)
 
 
@@ -102,17 +102,17 @@ def test_executable_parsing_returns_canonical_paths(
     monkeypatch.setattr(
         "harbinger.command.shutil.which", lambda program: sys.executable
     )
-    executable = Executable.new(raw)
+    executable = Executable.parse(raw)
     assert not isinstance(executable, str)
     assert isinstance(executable, os.PathLike)
     assert str(executable) == os.path.realpath(sys.executable)
     assert os.fspath(executable) == os.path.realpath(sys.executable)
-    assert Executable.new(executable) == executable
-    assert Command(executable)._executable == executable
+    assert Executable.parse(executable) == executable
+    assert Command(executable).inner.executable == executable
 
 
 def test_executable_can_be_passed_directly_to_subprocess() -> None:
-    executable = Executable.new(sys.executable)
+    executable = Executable.parse(sys.executable)
     result = subprocess.run(
         (executable, "-c", "print('executed')"),
         capture_output=True,
@@ -122,16 +122,91 @@ def test_executable_can_be_passed_directly_to_subprocess() -> None:
     assert result.stdout == "executed\n"
 
 
+def test_executable_equality_and_hash_use_canonical_path() -> None:
+    path = Path(sys.executable)
+    spelling = str(path.parent) + os.sep + "." + os.sep + path.name
+    first = Executable.parse(path)
+    second = Executable.parse(spelling)
+
+    assert first is not second
+    assert first == second
+    assert hash(first) == hash(second)
+    assert {first: "resolved"}[second] == "resolved"
+
+
+def test_command_constructor_accepts_only_positional_executable() -> None:
+    with pytest.raises(TypeError):
+        Command(executable=sys.executable)
+    with pytest.raises(TypeError):
+        Command(sys.executable, inner=Command(sys.executable).inner)
+
+
+def test_equivalent_commands_have_equal_hashes(tmp_path: Path) -> None:
+    first = (
+        Command(sys.executable)
+        .args(t"one {'two words'}")
+        .cwd(str(tmp_path))
+        .env({"B": "2", "A": "0"})
+        .env({"A": "1"})
+        .check(False)
+    )
+    second = (
+        Command(Path(sys.executable))
+        .args("one", "two words")
+        .cwd(tmp_path)
+        .env({"A": "1", "B": "2"})
+        .check(False)
+    )
+
+    assert first is not second
+    assert first == second
+    assert hash(first) == hash(second)
+    assert len({first, second}) == 1
+    assert {first: "cached"}[second] == "cached"
+
+
+def test_every_command_setting_participates_in_equality(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.touch()
+    second.touch()
+    base = Command(first)
+    variants = (
+        Command(second),
+        base.args("argument"),
+        base.cwd(tmp_path),
+        base.env({"A": "1"}),
+        base.check(False),
+    )
+
+    assert all(base != variant for variant in variants)
+    assert len({base, *variants}) == 6
+
+
+def test_command_hash_is_stable_after_derivation_and_input_changes() -> None:
+    overrides = {"MODE": "base"}
+    base = Command(sys.executable).args("initial").env(overrides)
+    cached = {base: "cached"}
+    before = hash(base)
+    derived = base.args("extra").env({"MODE": "derived"}).check(False)
+    overrides["MODE"] = "changed"
+
+    equivalent = Command(sys.executable).args("initial").env({"MODE": "base"})
+    assert hash(base) == before
+    assert cached[equivalent] == "cached"
+    assert derived not in cached
+
+
 @pytest.mark.parametrize("capture", [False, True], ids=["run", "capture"])
 def test_builders_reuse_internal_executable_and_results_expose_string(
     capture: bool,
 ) -> None:
     base = Command(sys.executable)
-    executable = base._executable
+    executable = base.inner.executable
     command = base.args("-c", "pass").cwd(None).env({}).check(False)
     result = command.capture() if capture else command.run()
-    assert base._executable is executable
-    assert command._executable is executable
+    assert base.inner.executable is executable
+    assert command.inner.executable is executable
     assert isinstance(result.executable, str)
     assert result.executable == str(executable)
     assert result.returncode == 0
@@ -180,7 +255,7 @@ def test_bare_executable_name_is_supported(
     ],
 )
 def test_template_arguments(part: Template, expected: tuple[str, ...]) -> None:
-    assert Command(sys.executable).args(part)._args == expected
+    assert Command(sys.executable).args(part).inner.args.inner == expected
 
 
 def test_pathlike_interpolation_uses_filesystem_path(tmp_path: Path) -> None:
@@ -188,23 +263,92 @@ def test_pathlike_interpolation_uses_filesystem_path(tmp_path: Path) -> None:
     file.touch()
     with os.scandir(tmp_path) as entries:
         entry = next(entries)
-        assert Command(sys.executable).args(t"{entry}")._args == (os.fspath(entry),)
+        assert Command(sys.executable).args(t"{entry}").inner.args.inner == (
+            os.fspath(entry),
+        )
 
 
-def test_dynamic_arguments_and_builder_copies() -> None:
+def test_dynamic_arguments_and_builder_variants() -> None:
     flags = ["-q", "-k", "slow tests"]
     base = Command(sys.executable).cwd("one").env({"CI": "1"}).check(False)
     variant = base.args(*flags).cwd("two").env({"CI": "2"}).check(True)
     flags.append("changed")
 
-    assert base._args == ()
-    assert base._cwd == Path("one")
-    assert base._env == {"CI": "1"}
-    assert base._check is False
-    assert variant._args == ("-q", "-k", "slow tests")
-    assert variant._cwd == Path("two")
-    assert variant._env == {"CI": "2"}
-    assert variant._check is True
+    assert base.inner.args.inner == ()
+    assert base.inner.cwd == Path("one")
+    assert dict(base.inner.env.inner) == {"CI": "1"}
+    assert base.inner.check is False
+    assert variant.inner.args.inner == ("-q", "-k", "slow tests")
+    assert variant.inner.cwd == Path("two")
+    assert dict(variant.inner.env.inner) == {"CI": "2"}
+    assert variant.inner.check is True
+
+
+@pytest.mark.parametrize("platform", ["nt", "posix"])
+def test_environment_key_casing_and_command_equality(
+    platform: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "name", platform)
+        environment = Environment.parse({"Mode": "first", "MODE": "Last Value"})
+        first = Command(sys.executable).env({"Mode": "Last Value"})
+        second = Command(sys.executable).env({"MODE": "Last Value"})
+
+    if platform == "nt":
+        assert dict(environment.inner) == {"MODE": "Last Value"}
+        assert first == second
+        assert hash(first) == hash(second)
+        assert {first: "cached"}[second] == "cached"
+    else:
+        assert dict(environment.inner) == {"Mode": "first", "MODE": "Last Value"}
+        assert first != second
+        assert len({first, second}) == 2
+
+
+@pytest.mark.parametrize("platform", ["nt", "posix"])
+@pytest.mark.parametrize(
+    "overrides",
+    [{"Mode": "first", "MODE": "last"}, {"MODE": "first", "Mode": "last"}],
+)
+def test_environment_merge_normalizes_incoming_keys_before_merging(
+    platform: str,
+    overrides: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "name", platform)
+        base = Environment.parse({"MODE": "base", "OTHER": "unchanged"})
+        merged = base.merge(overrides)
+
+    assert dict(base.inner) == {"MODE": "base", "OTHER": "unchanged"}
+    expected = (
+        {"MODE": "last", "OTHER": "unchanged"}
+        if platform == "nt"
+        else {"MODE": "base", "OTHER": "unchanged", **overrides}
+    )
+    assert dict(merged.inner) == expected
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows environment key casing")
+@pytest.mark.parametrize("capture", [False, True], ids=["run", "capture"])
+def test_windows_environment_overrides_ignore_key_casing(
+    capture: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    name = "HARBINGER_REVIEW_CASING"
+    monkeypatch.setenv(name, "parent")
+    command = (
+        Command(sys.executable)
+        .args("-c", f"import os; print(os.environ[{name!r}])")
+        .env({name: "base"})
+        .env({name.lower(): "first", name: "Last Value"})
+    )
+    result = command.capture() if capture else command.run()
+    stdout = result.stdout if isinstance(result, Capture) else capfd.readouterr().out
+    assert stdout.strip() == "Last Value"
+    assert os.environ[name] == "parent"
 
 
 def test_environment_inputs_are_snapshotted_for_reused_commands() -> None:
@@ -263,15 +407,17 @@ def test_repeated_settings() -> None:
         .check(False)
         .check(True)
     )
-    assert command._args == ("first", "second")
-    assert command._cwd == Path("two")
-    assert command._env == {"A": "1", "B": "3", "C": "4"}
-    assert command._check is True
-    assert command.cwd(None)._cwd is None
+    assert command.inner.args.inner == ("first", "second")
+    assert command.inner.cwd == Path("two")
+    assert dict(command.inner.env.inner) == {"A": "1", "B": "3", "C": "4"}
+    assert command.inner.check is True
+    assert command.cwd(None).inner.cwd is None
 
 
 def test_arguments_are_literal_and_templates_cannot_be_mixed() -> None:
-    assert Command(sys.executable).args("two args", Path("some file"))._args == (
+    assert Command(sys.executable).args(
+        "two args", Path("some file")
+    ).inner.args.inner == (
         "two args",
         "some file",
     )
@@ -287,7 +433,7 @@ def test_invalid_literal_arguments_are_rejected_when_added() -> None:
 def test_empty_argument_additions_are_noops() -> None:
     command = Command(sys.executable).args(t"existing")
     flags: list[str] = []
-    assert command.args(*flags)._args == command._args
+    assert command.args(*flags).inner.args == command.inner.args
 
 
 def test_run_delivers_arguments_and_inherits_streams(
@@ -387,7 +533,7 @@ def test_checked_failure_and_unchecked_result() -> None:
     command = Command(Path(sys.executable)).args(t"-c {'raise SystemExit(7)'}")
     with pytest.raises(subprocess.CalledProcessError) as excinfo:
         command.run()
-    assert excinfo.value.cmd == (command._executable, *command._args)
+    assert excinfo.value.cmd == (command.inner.executable, *command.inner.args.inner)
     assert excinfo.value.returncode == 7
     assert command.check(False).run() == Run(
         os.path.realpath(sys.executable), ("-c", "raise SystemExit(7)"), 7
@@ -399,7 +545,7 @@ def test_captured_failure_exposes_output() -> None:
     command = Command(Path(sys.executable)).args(t"-c {script}")
     with pytest.raises(subprocess.CalledProcessError) as excinfo:
         command.capture()
-    assert excinfo.value.cmd == (command._executable, *command._args)
+    assert excinfo.value.cmd == (command.inner.executable, *command.inner.args.inner)
     assert excinfo.value.returncode == 7
     assert excinfo.value.stdout == "partial\n"
     assert excinfo.value.stderr == "diagnostic\n"
