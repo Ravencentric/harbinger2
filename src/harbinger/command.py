@@ -16,12 +16,14 @@ type StrOrPath = str | os.PathLike[str]
 @final
 @dataclass(frozen=True, slots=True)
 class Executable(os.PathLike[str]):
-    """The canonical absolute path to an existing executable file."""
+    """An absolute path to an existing executable file, preserving symlinks."""
 
     inner: str
 
     @classmethod
     def parse(cls, value: StrOrPath, /) -> Executable:
+        # NOTE: never call os.path.realpath() here
+        # because we want to preserve symlinks
         program = os.fspath(value)
 
         if not program:
@@ -30,7 +32,7 @@ class Executable(os.PathLike[str]):
         if os.path.isabs(program):
             if not os.path.isfile(program):
                 raise ValueError(f"executable must be an existing file: {program!r}")
-            return cls(os.path.realpath(program))
+            return cls(os.path.abspath(program))
 
         if program in (".", "..") or os.path.basename(program) != program:
             raise ValueError(
@@ -38,7 +40,7 @@ class Executable(os.PathLike[str]):
             )
 
         if found := shutil.which(program):
-            return cls(os.path.realpath(found))
+            return cls(os.path.abspath(found))
 
         raise FileNotFoundError(program)
 

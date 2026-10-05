@@ -162,7 +162,7 @@ and relative executable paths such as
 Resolve local paths explicitly, for example
 `Cmd(Path("bin/tool").resolve())`. Bare names absent from `PATH` raise
 `FileNotFoundError`.
-The stored path is canonical and absolute.
+The stored path is absolute and preserves symlinks.
 
 Pass arguments with `.args()`: one t-string per call, or any number of literal
 strings and paths.
@@ -235,7 +235,7 @@ directory. Relative working directories resolve at execution time, and
 `.cwd(None)` restores directory inheritance.
 
 `.run()` returns an immutable `Run` with `.executable`, `.args`, and
-`.returncode`. `.executable` is the canonical absolute executable path as a string.
+`.returncode`. `.executable` is the absolute executable path as a string, preserving symlinks.
 `.args` is a tuple of strings containing the arguments passed to the child,
 excluding the executable. Path-like arguments were converted when added to the
 command.
