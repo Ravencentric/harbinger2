@@ -159,8 +159,8 @@ including `Path("git")`, are resolved through the current `PATH` during
 construction. Absolute paths that do not point to an existing file, empty names,
 and relative executable paths such as
 `./tool`, `../tool`, and `bin/tool` raise `ValueError`.
-Resolve local paths explicitly, for example
-`Cmd(Path("bin/tool").resolve())`. Bare names absent from `PATH` raise
+Make local paths absolute explicitly, for example
+`Cmd(Path("bin/tool").absolute())`. Bare names absent from `PATH` raise
 `FileNotFoundError`.
 The stored path is absolute and preserves symlinks.
 
