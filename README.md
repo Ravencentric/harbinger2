@@ -62,15 +62,13 @@ the first failure. Repeating a name runs that task again.
 Tasks are excluded from `--default` unless you opt them in:
 
 ```python
-import subprocess
-
-from harbinger import task
+from harbinger import Cmd, task
 
 
 @task(default=True)
 def test() -> None:
     """Run the test suite."""
-    subprocess.run(["pytest"], check=True)
+    Cmd("pytest").run()
 ```
 
 `--default` runs the marked tasks in listing order, using their parameter
@@ -133,6 +131,121 @@ harbinger cp -- --recursive src dst
 
 Options may appear before or after the positional values. `*args` cannot be
 combined with other positional parameters, and `**kwargs` is not supported.
+
+## External commands
+
+`Cmd` builds a reusable invocation. `.run()` executes it synchronously with
+inherited stdin, stdout, and stderr. Nonzero exit statuses raise by default.
+There is no shell option or automatic command echo.
+
+```python
+from pathlib import Path
+from harbinger import Cmd
+
+project = Path("my project")
+uv = Cmd("uv").args(t"run").cwd(project)
+
+uv.args(t"pytest").run()
+uv.args(t"ruff check").args("--fix").run()
+
+paths = [Path("first file.py"), Path("second file.py")]
+Cmd("git").args("add", *paths).run()
+```
+
+Pass the executable as a string or path. It is a single path, so
+`Cmd("git status")` looks for a program named `git status`. Path-like inputs
+are converted with `os.fspath()` and follow the same rules as strings. Bare names,
+including `Path("git")`, are resolved through the current `PATH` during
+construction. Absolute paths that do not point to an existing file, empty names,
+and relative executable paths such as
+`./tool`, `../tool`, and `bin/tool` raise `ValueError`.
+Make local paths absolute explicitly, for example
+`Cmd(Path("bin/tool").absolute())`. Bare names absent from `PATH` raise
+`FileNotFoundError`.
+The stored path is absolute and preserves symlinks.
+
+Pass arguments with `.args()`: one t-string per call, or any number of literal
+strings and paths.
+Unpack a sequence of arguments with `*`. Literal strings are stored unchanged;
+path-like arguments are converted with `os.fspath()` when `.args()` is called.
+The resulting strings are fixed for every execution. Empty additions do nothing.
+
+Templates use `shlex` POSIX quoting rules on every platform. Interpolated values
+are quoted automatically before splitting, so write `{path}` without surrounding
+shell quotes. Path-like interpolations use `os.fspath()`. Prefer interpolated
+paths, especially for Windows backslashes. There is no shell expansion or
+execution; operators are ordinary arguments.
+
+```python
+Cmd("git").args(t'commit -m "release build"').run()
+Cmd("tool").args(t"--output={project / 'build files'}").run()
+
+count = 7
+Cmd("tool").args(t"--count={count:03d}").run()
+```
+
+Python conversions (`!s`, `!r`, `!a`) and format specifications work on
+interpolated values. Unpack a sequence when a collection should become multiple
+command arguments:
+
+```python
+flags = ["-q", "-k", "slow tests"]
+Cmd("pytest").args(*flags).run()
+```
+
+### Configuration and reuse
+
+Optional settings are configured through builder methods. Every method returns a
+new command; retain the return value when building conditionally.
+
+| Method | Behavior when repeated |
+| --- | --- |
+| `.args(*values)` | Append literal arguments, or parse one t-string. |
+| `.cwd(path)` | Replace the directory; the last call wins. |
+| `.env(mapping)` | Merge string overrides; later values replace identical keys. |
+| `.check(enabled)` | Replace exit checking; the default is `True`. |
+
+```python
+base = Cmd("pytest").env({"CI": "1", "DEBUG": "0"})
+debug = base.env({"DEBUG": "1"})
+debug.run()  # base still has DEBUG=0
+
+probe = Cmd("git").args(t"diff --quiet").check(False)
+result = probe.run()
+print(result.returncode)
+```
+
+Builder methods return new command variants: deriving `debug` above does not
+change `base`. Arguments are stored in tuples and environment overrides are
+copied from the supplied mappings. Repeated `.args()` calls append arguments;
+repeated `.cwd()` and `.check()` calls replace their settings. Repeated `.env()`
+calls merge dictionaries by key.
+
+Commands compare by their configured executable, arguments, working directory,
+environment overrides, and exit checking. Equivalent commands have equal hashes
+and can be used as dictionary keys or set members. The insertion order of
+environment overrides does not affect equality. On Windows, override names are
+normalized to uppercase, so casing does not affect merging or equality. On other
+platforms, names remain case sensitive.
+
+Commands inherit the parent environment at execution time, with `.env()` string
+overrides applied on top. Overrides never modify the parent environment, and an
+empty mapping changes nothing. By default, commands also inherit the working
+directory. Relative working directories resolve at execution time, and
+`.cwd(None)` restores directory inheritance.
+
+`.run()` returns an immutable `Run` with `.executable`, `.args`, and
+`.returncode`. `.executable` is the absolute executable path as a string, preserving symlinks.
+`.args` is a tuple of strings containing the arguments passed to the child,
+excluding the executable. Path-like arguments were converted when added to the
+command.
+`.capture()` captures both output streams as UTF-8 text and returns `Capture`,
+adding `.stdout` and `.stderr`. `.stdout()` executes and returns stripped stdout;
+use `.capture().stdout` to preserve whitespace.
+Checked failures raise `subprocess.CalledProcessError`. Failures from
+`.capture()` retain captured output on the exception, and Harbinger prints
+captured stderr in its task-failure diagnostic. Launch errors such as
+`FileNotFoundError` and interruptions propagate normally.
 
 ## Errors and execution
 
