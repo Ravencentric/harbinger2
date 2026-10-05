@@ -62,13 +62,13 @@ the first failure. Repeating a name runs that task again.
 Tasks are excluded from `--default` unless you opt them in:
 
 ```python
-from harbinger import Command, task
+from harbinger import Cmd, task
 
 
 @task(default=True)
 def test() -> None:
     """Run the test suite."""
-    Command("pytest").run()
+    Cmd("pytest").run()
 ```
 
 `--default` runs the marked tasks in listing order, using their parameter
@@ -134,33 +134,33 @@ combined with other positional parameters, and `**kwargs` is not supported.
 
 ## External commands
 
-`Command` builds a reusable invocation. `.run()` executes it synchronously with
+`Cmd` builds a reusable invocation. `.run()` executes it synchronously with
 inherited stdin, stdout, and stderr. Nonzero exit statuses raise by default.
 There is no shell option or automatic command echo.
 
 ```python
 from pathlib import Path
-from harbinger import Command
+from harbinger import Cmd
 
 project = Path("my project")
-uv = Command("uv").args(t"run").cwd(project)
+uv = Cmd("uv").args(t"run").cwd(project)
 
 uv.args(t"pytest").run()
 uv.args(t"ruff check").args("--fix").run()
 
 paths = [Path("first file.py"), Path("second file.py")]
-Command("git").args("add", *paths).run()
+Cmd("git").args("add", *paths).run()
 ```
 
 Pass the executable as a string or path. It is a single path, so
-`Command("git status")` looks for a program named `git status`. Path-like inputs
+`Cmd("git status")` looks for a program named `git status`. Path-like inputs
 are converted with `os.fspath()` and follow the same rules as strings. Bare names,
 including `Path("git")`, are resolved through the current `PATH` during
 construction. Absolute paths that do not point to an existing file, empty names,
 and relative executable paths such as
 `./tool`, `../tool`, and `bin/tool` raise `ValueError`.
 Resolve local paths explicitly, for example
-`Command(Path("bin/tool").resolve())`. Bare names absent from `PATH` raise
+`Cmd(Path("bin/tool").resolve())`. Bare names absent from `PATH` raise
 `FileNotFoundError`.
 The stored path is canonical and absolute.
 
@@ -177,11 +177,11 @@ paths, especially for Windows backslashes. There is no shell expansion or
 execution; operators are ordinary arguments.
 
 ```python
-Command("git").args(t'commit -m "release build"').run()
-Command("tool").args(t"--output={project / 'build files'}").run()
+Cmd("git").args(t'commit -m "release build"').run()
+Cmd("tool").args(t"--output={project / 'build files'}").run()
 
 count = 7
-Command("tool").args(t"--count={count:03d}").run()
+Cmd("tool").args(t"--count={count:03d}").run()
 ```
 
 Python conversions (`!s`, `!r`, `!a`) and format specifications work on
@@ -190,7 +190,7 @@ command arguments:
 
 ```python
 flags = ["-q", "-k", "slow tests"]
-Command("pytest").args(*flags).run()
+Cmd("pytest").args(*flags).run()
 ```
 
 ### Configuration and reuse
@@ -206,11 +206,11 @@ new command; retain the return value when building conditionally.
 | `.check(enabled)` | Replace exit checking; the default is `True`. |
 
 ```python
-base = Command("pytest").env({"CI": "1", "DEBUG": "0"})
+base = Cmd("pytest").env({"CI": "1", "DEBUG": "0"})
 debug = base.env({"DEBUG": "1"})
 debug.run()  # base still has DEBUG=0
 
-probe = Command("git").args(t"diff --quiet").check(False)
+probe = Cmd("git").args(t"diff --quiet").check(False)
 result = probe.run()
 print(result.returncode)
 ```

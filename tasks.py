@@ -2,9 +2,9 @@ import builtins
 from pathlib import Path
 from typing import Literal
 
-from harbinger import Command, task
+from harbinger import Cmd, task
 
-uv = Command("uv").args("run")
+uv = Cmd("uv").args("run")
 
 
 @task(default=True)

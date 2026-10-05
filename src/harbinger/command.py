@@ -157,7 +157,7 @@ class State:
 
 @final
 @dataclass(frozen=True, slots=True, init=False)
-class Command:
+class Cmd:
     inner: State
 
     def __init__(self, executable: StrOrPath, /) -> None:
@@ -167,26 +167,26 @@ class Command:
     def __repr__(self) -> str:
         state = self.inner
         return (
-            f"<Command(executable={state.executable!r}, args={state.args.inner!r}, "
+            f"<Cmd(executable={state.executable!r}, args={state.args.inner!r}, "
             f"cwd={state.cwd!r}, env={dict(sorted(state.env.inner))!r}, check={state.check!r})>"
         )
 
     @overload
-    def args(self, args: Template, /) -> Command: ...
+    def args(self, args: Template, /) -> Cmd: ...
 
     @overload
-    def args(self, *args: StrOrPath) -> Command: ...
+    def args(self, *args: StrOrPath) -> Cmd: ...
 
-    def args(self, *args: StrOrPath | Template) -> Command:
+    def args(self, *args: StrOrPath | Template) -> Cmd:
         return command(self, args=self.inner.args.concat(args))
 
-    def cwd(self, path: StrOrPath | None, /) -> Command:
+    def cwd(self, path: StrOrPath | None, /) -> Cmd:
         return command(self, cwd=Path(path) if path is not None else None)
 
-    def env(self, overrides: Mapping[str, str], /) -> Command:
+    def env(self, overrides: Mapping[str, str], /) -> Cmd:
         return command(self, env=self.inner.env.merge(overrides))
 
-    def check(self, enabled: bool, /) -> Command:
+    def check(self, enabled: bool, /) -> Cmd:
         return command(self, check=enabled)
 
     def run(self) -> Run:
@@ -225,7 +225,7 @@ class Command:
         return self.capture().stdout.strip()
 
 
-def command(source: Command, /, **changes: Any) -> Command:
-    result = object.__new__(Command)
+def command(source: Cmd, /, **changes: Any) -> Cmd:
+    result = object.__new__(Cmd)
     object.__setattr__(result, "inner", replace(source.inner, **changes))
     return result
