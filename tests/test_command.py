@@ -34,7 +34,7 @@ def test_executable_requires_existing_file(
     if kind == "file":
         parsed = constructor(value)
         executable = parsed.inner.executable if isinstance(parsed, Cmd) else parsed
-        assert os.fspath(executable) == os.path.realpath(path)
+        assert os.fspath(executable) == os.path.abspath(path)
     else:
         with pytest.raises(ValueError):
             constructor(value)
@@ -95,7 +95,7 @@ def test_windows_relative_executable_paths_raise_value_error(
 @pytest.mark.parametrize(
     "raw", ["tool", "git status", sys.executable, Path(sys.executable)]
 )
-def test_executable_parsing_returns_canonical_paths(
+def test_executable_parsing_returns_absolute_paths(
     raw: str | os.PathLike[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -105,10 +105,35 @@ def test_executable_parsing_returns_canonical_paths(
     executable = Executable.parse(raw)
     assert not isinstance(executable, str)
     assert isinstance(executable, os.PathLike)
-    assert str(executable) == os.path.realpath(sys.executable)
-    assert os.fspath(executable) == os.path.realpath(sys.executable)
+    assert str(executable) == os.path.abspath(sys.executable)
+    assert os.fspath(executable) == os.path.abspath(sys.executable)
     assert Executable.parse(executable) == executable
     assert Cmd(executable).inner.executable == executable
+
+
+@pytest.mark.parametrize("constructor", [Cmd, Executable.parse])
+@pytest.mark.parametrize("bare_name", [False, True], ids=["absolute", "bare-name"])
+def test_executable_parsing_preserves_symlinks(
+    constructor: Callable[[str | os.PathLike[str]], Cmd | Executable],
+    bare_name: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "target"
+    target.touch()
+    link = tmp_path / "link"
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if os.name == "nt" and exc.winerror == 1314:
+            pytest.skip("Creating symlinks requires Windows symlink privileges")
+        raise
+
+    monkeypatch.setattr("harbinger.command.shutil.which", lambda program: str(link))
+    parsed = constructor("tool" if bare_name else link)
+    executable = parsed.inner.executable if isinstance(parsed, Cmd) else parsed
+    assert str(executable) == str(link)
+    assert os.fspath(executable) == str(link)
 
 
 def test_executable_can_be_passed_directly_to_subprocess() -> None:
@@ -223,7 +248,7 @@ def test_absolute_executable_is_canonical_and_independent_of_cwd(
     executable = str(path.parent) + os.sep + "." + os.sep + path.name
     command = Cmd(executable).args("-c", "pass").cwd(tmp_path)
     result = command.capture() if capture else command.run()
-    assert result.executable == os.path.realpath(executable)
+    assert result.executable == os.path.abspath(executable)
     assert result.returncode == 0
 
 
@@ -238,7 +263,7 @@ def test_bare_executable_name_is_supported(
     monkeypatch.setenv("PATH", str(executable.parent))
     command = Cmd(executable.name).args("-c", "pass")
     result = command.capture() if capture else command.run()
-    assert result.executable == os.path.realpath(executable)
+    assert result.executable == os.path.abspath(executable)
     assert result.returncode == 0
 
 
@@ -442,7 +467,7 @@ def test_run_delivers_arguments_and_inherits_streams(
     command = Cmd(Path(sys.executable)).args(t"-c {script}").args(*values)
     result = command.run()
     assert result == Run(
-        os.path.realpath(sys.executable),
+        os.path.abspath(sys.executable),
         ("-c", script, *(os.fspath(value) for value in values)),
         0,
     )
@@ -511,7 +536,7 @@ def test_capture_preserves_text_and_stdout_strips_it() -> None:
     )
     command = Cmd(Path(sys.executable)).args(t"-c {script}")
     assert command.capture() == Capture(
-        os.path.realpath(sys.executable),
+        os.path.abspath(sys.executable),
         ("-c", script),
         0,
         "  value \n\n",
@@ -534,7 +559,7 @@ def test_checked_failure_and_unchecked_result() -> None:
     assert excinfo.value.cmd == (command.inner.executable, *command.inner.args.inner)
     assert excinfo.value.returncode == 7
     assert command.check(False).run() == Run(
-        os.path.realpath(sys.executable), ("-c", "raise SystemExit(7)"), 7
+        os.path.abspath(sys.executable), ("-c", "raise SystemExit(7)"), 7
     )
 
 
