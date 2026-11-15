@@ -1,84 +1,135 @@
 # harbinger
 
-Harbinger runs Python functions from a `tasks.py` file as command-line tasks.
+Harbinger is a small, dependency-free task runner where a task is a regular Python
+function.
 
-## Install
+It's meant for Python projects because they already depend on Python, and it's
+primarily meant for me. I believe declarative task runners just (foreshadowing)
+cannot do everything I want them to, like cleaning up a bunch of artifacts in a
+cross-platform way.
 
-Harbinger requires Python 3.14 or newer. Add it to the project whose tasks you
-want to run:
+I could use a justfile and shell out, but then it's no longer cross-platform. I
+could use justfile's `[script]`, but then I might as well just write a Python
+script and call it directly instead.
+
+`poethepoet` and `tox`, being declarative, suffer from much of the same issues.
+Then there's `nox`, where you do write tasks in Python, but it's a full-blown
+environment manager and more, and I'd have to go out of my way to stop it from
+doing a bunch of extra work.
+
+> [!NOTE]
+> While I like where the API is going, I'm certain there will be a few
+> sweeping and breaking changes. I've been on and off working on this
+> for months now waiting to get the API right but that's not gonna happen
+> anytime soon and I want to start dogfooding it now.
+
+## Table Of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Task arguments](#task-arguments)
+- [Running commands](#running-commands)
+- [Errors and limitations](#errors-and-limitations)
+- [Development](#development)
+
+## Installation
+
+Harbinger requires Python 3.14 or newer because it uses
+[t-strings](https://docs.python.org/3/whatsnew/3.14.html#whatsnew314-template-string-literals).
+Add it to your project's development dependencies with
+[`uv`](https://docs.astral.sh/uv/):
 
 ```console
 uv add --dev harbinger
 ```
 
-Run it with `uv run harbinger`. The examples below use `harbinger` for brevity.
-`uv run python -m harbinger` also works.
+You can then run it with `uv run harbinger`, or `uv run python -m harbinger`.
+The examples below use `harbinger` for brevity.
 
-## Define tasks
+> [!NOTE]
+> Your project can still support older Python versions. Only the environment
+> running Harbinger needs Python 3.14 or newer.
+>
+> With uv, you can give your development dependencies a separate Python requirement
+> in `pyproject.toml`:
+>
+> ```toml
+> # <https://docs.astral.sh/uv/reference/settings/#dependency-groups>
+> [tool.uv.dependency-groups]
+> dev = { requires-python = ">=3.14" }
+> ```
+>
+> If you don't use uv, you should check your tool's documentation for something similar.
 
-Create `tasks.py` in your project root and decorate functions with `@task`:
+## Usage
 
-```python
-from harbinger import task
-
-
-@task
-def hello() -> None:
-    """Print a greeting."""
-    print("Hello")
-
-
-@task
-def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
-    """Greet someone N times."""
-    message = f"Hello, {name}!"
-    if loud:
-        message = message.upper()
-    for _ in range(count):
-        print(message)
-```
-
-Harbinger uses the function name as the task name and the docstring as its
-description. Underscores in task names become hyphens on the command line:
-`my_task` becomes `my-task`. Use `@task(name="...", description="...")` to
-override either value. The task list shows the first line of each description;
-task help shows the full description.
-
-## Run tasks
-
-```console
-harbinger                 # list available tasks
-harbinger --list          # list available tasks explicitly
-harbinger hello           # run one task
-harbinger hello greet     # run both tasks in order
-harbinger --default       # run tasks marked default=True
-harbinger --version       # print the version
-```
-
-Use either `--list`, `--default`, or task names; they cannot be combined.
-Harbinger checks every named task before running any of them, then stops at
-the first failure. Repeating a name runs that task again.
-
-Tasks are excluded from `--default` unless you opt them in:
+Create a `tasks.py` file in your project root and decorate your functions with
+`@task`:
 
 ```python
 from harbinger import Cmd, task
 
 
 @task(default=True)
+def lint() -> None:
+    """Check the code with Ruff."""
+    Cmd("ruff").args(t"check").run()
+
+
+@task(default=True)
 def test() -> None:
     """Run the test suite."""
     Cmd("pytest").run()
+
+
+@task
+def ci() -> None:
+    """Run all checks."""
+    lint()
+    test()
 ```
 
-`--default` runs the marked tasks in listing order, using their parameter
-defaults. The task list marks them with `*`. If none are marked, `--default`
-exits with a usage error. Running `harbinger` without arguments lists tasks;
-it never runs them.
+Run Harbinger from the directory containing `tasks.py`:
 
-### Task arguments
+```console
+harbinger                 # List the available tasks
+harbinger lint            # Run a task
+harbinger lint test       # Run several tasks in order
+harbinger ci              # Call other tasks from a task
+harbinger --default       # Run tasks marked default=True
+harbinger --help          # Show command-line help
+```
 
-Put `--` between a task name and its arguments:
+The function name becomes the task name, with underscores replaced by hyphens.
+For example, `build_docs` becomes `build-docs`. The docstring becomes its
+description. You can override either with `@task(name="...", description="...")`.
+
+When you pass several task names, Harbinger checks that all of them exist before
+running anything. Tasks run in the order you pass them, stopping at the first
+failure.
+
+`--default` runs the tasks marked `default=True` in the order they appear in
+`tasks.py`, using their parameter defaults.
+
+## Task arguments
+
+Harbinger uses your function's signature to build its command-line interface.
+Positional parameters become positional arguments, and keyword-only parameters
+become options:
+
+```python
+from harbinger import task
+
+
+@task
+def greet(name: str = "World", *, count: int = 1, loud: bool = False) -> None:
+    """Greet someone a number of times."""
+    message = f"Hello, {name}!"
+    for _ in range(count):
+        print(message.upper() if loud else message)
+```
+
+Put `--` between the task name and its arguments:
 
 ```console
 harbinger greet -- Alice
@@ -88,31 +139,28 @@ harbinger greet -- Dana --no-loud
 harbinger greet -- --help
 ```
 
-Arguments can be passed to one task at a time. Without the separator, words
-after the first task name are treated as more task names. In task options,
-underscores become hyphens: `output_dir` becomes `--output-dir`.
+Without the separator, `Alice` would be treated as another task name. Arguments
+can only be passed to one task at a time. Underscores in option names become
+hyphens too, so `output_dir` becomes `--output-dir`.
 
-## Task parameters
+### Supported types
 
-Every parameter except `*args` needs a default value. Parameters without an
-annotation are treated as strings. Supported annotations are:
+Every parameter except `*args` needs a default value. Parameters without a type
+annotation are parsed as strings.
 
-| Annotation | Command-line behavior |
+| Annotation | Behavior |
 | --- | --- |
-| `str`, `int`, `float`, `Path` | Parsed as the annotated type. |
-| `bool` | Keyword-only; accepts `--flag` and `--no-flag`. |
-| `Literal["dev", "prod"]` | Accepts one of the listed strings. |
-| `Literal[1, 2]` | Accepts one of the listed integers. |
+| `str`, `int`, `float`, `Path` | Convert the argument to the given type. |
+| `bool` | Accept `--flag` and `--no-flag`. Must be keyword-only. |
+| `Literal["dev", "prod"]` | Accept one of the listed strings. |
+| `Literal[1, 2]` | Accept one of the listed integers. |
 
-Import `Path` from `pathlib` and `Literal` from `typing`.
+I'll add more types here if I find real use cases.
 
-Positional parameters use their names as placeholders. Keyword-only parameters
-become options. The `greet` task above accepts an optional `name` and the
-`--count` and `--loud` options after the separator. `Literal` choices must all
-be strings or all be integers.
+### Variable arguments
 
-A task can accept any number of positional values with `*args`. It can also
-have keyword-only parameters after `*args`:
+Use `*args` to accept any number of positional values. You can also have
+keyword-only parameters after it:
 
 ```python
 from pathlib import Path
@@ -120,153 +168,133 @@ from harbinger import task
 
 
 @task
-def cp(*paths: Path, recursive: bool = False) -> None:
+def paths(*paths: Path, absolute: bool = False) -> None:
+    """Print the given paths."""
     for path in paths:
-        print(path, recursive)
+        print(path.absolute() if absolute else path)
 ```
 
 ```console
-harbinger cp -- --recursive src dst
+harbinger paths -- src tests
+harbinger paths -- --absolute src tests
 ```
 
-Options may appear before or after the positional values. `*args` cannot be
-combined with other positional parameters, and `**kwargs` is not supported.
+Options can appear before or after the positional values. `*args` can't be
+combined with other positional parameters, and `**kwargs` isn't supported.
 
-## External commands
+## Running commands
 
-`Cmd` builds a reusable invocation. `.run()` executes it synchronously with
-inherited stdin, stdout, and stderr. Nonzero exit statuses raise by default.
-There is no shell option or automatic command echo.
+`Cmd` lets you build and reuse external commands:
+
+```python
+from harbinger import Cmd
+
+uv = Cmd("uv").args(t"run")
+
+uv.args(t"ruff check").run()
+uv.args(t"pytest").run()
+```
+
+`.run()` waits for the command to finish and uses the parent's stdin, stdout, and
+stderr. A nonzero exit status raises `subprocess.CalledProcessError` by default.
+
+### Arguments and t-strings
+
+Pass the executable to `Cmd`, then add arguments with `.args()`. Each call accepts
+either one t-string or any number of strings and paths:
 
 ```python
 from pathlib import Path
 from harbinger import Cmd
 
-project = Path("my project")
-uv = Cmd("uv").args(t"run").cwd(project)
-
-uv.args(t"pytest").run()
-uv.args(t"ruff check").args("--fix").run()
-
 paths = [Path("first file.py"), Path("second file.py")]
+
 Cmd("git").args("add", *paths).run()
-```
-
-Pass the executable as a string or path. It is a single path, so
-`Cmd("git status")` looks for a program named `git status`. Path-like inputs
-are converted with `os.fspath()` and follow the same rules as strings. Bare names,
-including `Path("git")`, are resolved through the current `PATH` during
-construction. Absolute paths that do not point to an existing file, empty names,
-and relative executable paths such as
-`./tool`, `../tool`, and `bin/tool` raise `ValueError`.
-Make local paths absolute explicitly, for example
-`Cmd(Path("bin/tool").absolute())`. Bare names absent from `PATH` raise
-`FileNotFoundError`.
-The stored path is absolute and preserves symlinks.
-
-Pass arguments with `.args()`: one t-string per call, or any number of literal
-strings and paths.
-Unpack a sequence of arguments with `*`. Literal strings are stored unchanged;
-path-like arguments are converted with `os.fspath()` when `.args()` is called.
-The resulting strings are fixed for every execution. Empty additions do nothing.
-
-Templates use `shlex` POSIX quoting rules on every platform. Interpolated values
-are quoted automatically before splitting, so write `{path}` without surrounding
-shell quotes. Path-like interpolations use `os.fspath()`. Prefer interpolated
-paths, especially for Windows backslashes. There is no shell expansion or
-execution; operators are ordinary arguments.
-
-```python
 Cmd("git").args(t'commit -m "release build"').run()
-Cmd("tool").args(t"--output={project / 'build files'}").run()
 
-count = 7
-Cmd("tool").args(t"--count={count:03d}").run()
+destination = Path("build files")
+Cmd("uv").args(t"build --out-dir={destination}").run()
 ```
+Notice how I never quoted `{destination}`.
+Thanks to t-strings, we can automatically quote interpolated values appropriately.
+This was inspired by [PEP 787 – Safer subprocess usage using t-strings](https://peps.python.org/pep-0787/).
 
-Python conversions (`!s`, `!r`, `!a`) and format specifications work on
-interpolated values. Unpack a sequence when a collection should become multiple
-command arguments:
+To pass a collection as separate arguments, unpack it with `*`:
 
 ```python
 flags = ["-q", "-k", "slow tests"]
 Cmd("pytest").args(*flags).run()
 ```
 
-### Configuration and reuse
-
-Optional settings are configured through builder methods. Every method returns a
-new command; retain the return value when building conditionally.
-
-| Method | Behavior when repeated |
-| --- | --- |
-| `.args(*values)` | Append literal arguments, or parse one t-string. |
-| `.cwd(path)` | Replace the directory; the last call wins. |
-| `.env(mapping)` | Merge string overrides; later values replace identical keys. |
-| `.check(enabled)` | Replace exit checking; the default is `True`. |
+A regular string is passed as is, which
+is important for filenames with spaces.
 
 ```python
-base = Cmd("pytest").env({"CI": "1", "DEBUG": "0"})
-debug = base.env({"DEBUG": "1"})
-debug.run()  # base still has DEBUG=0
+add = Cmd("git").args("add")
+add.args("my file.py").run() # git add "my file.py"
+```
 
-probe = Cmd("git").args(t"diff --quiet").check(False)
-result = probe.run()
+### Executables
+
+Pass a program name to look it up on the current `PATH` when the command is
+created, as in `Cmd("git")`. You can also pass an absolute executable path:
+
+Relative executable paths such as `./tool` or `bin/tool` aren't accepted.
+This is because their resolution is ambiguous. Should it be relative to
+`tasks.py` or relative to your cwd?
+
+### Configuration and reuse
+
+`Cmd` is an immutable object, so every method returns a new instance:
+
+```python
+from harbinger import Cmd
+
+base = Cmd("pytest").env({"CI": "1", "DEBUG": "0"})
+debug = base.env({"DEBUG": "1"}).args("-s")
+
+base.run()   # DEBUG=0
+debug.run()  # DEBUG=1, with -s
+```
+
+### Output and exit status
+
+`.run()` returns a `Run` with `.executable`, `.args` (excluding the executable),
+and `.returncode`. To handle a nonzero exit status yourself, turn off checking:
+
+```python
+from harbinger import Cmd
+
+result = Cmd("git").args(t"diff --quiet").check(False).run()
 print(result.returncode)
 ```
 
-Builder methods return new command variants: deriving `debug` above does not
-change `base`. Arguments are stored in tuples and environment overrides are
-copied from the supplied mappings. Repeated `.args()` calls append arguments;
-repeated `.cwd()` and `.check()` calls replace their settings. Repeated `.env()`
-calls merge dictionaries by key.
+`.capture()` captures stdout and stderr as UTF-8 text, returning a `Capture`
+with the same fields plus `.stdout` and `.stderr`:
 
-Commands compare by their configured executable, arguments, working directory,
-environment overrides, and exit checking. Equivalent commands have equal hashes
-and can be used as dictionary keys or set members. The insertion order of
-environment overrides does not affect equality. On Windows, override names are
-normalized to uppercase, so casing does not affect merging or equality. On other
-platforms, names remain case sensitive.
+```python
+result = Cmd("git").args(t"status --short").capture()
+print(result.stdout)
+print(result.stderr)
 
-Commands inherit the parent environment at execution time, with `.env()` string
-overrides applied on top. Overrides never modify the parent environment, and an
-empty mapping changes nothing. By default, commands also inherit the working
-directory. Relative working directories resolve at execution time, and
-`.cwd(None)` restores directory inheritance.
+commit = Cmd("git").args(t"rev-parse HEAD").stdout()
+```
 
-`.run()` returns an immutable `Run` with `.executable`, `.args`, and
-`.returncode`. `.executable` is the absolute executable path as a string, preserving symlinks.
-`.args` is a tuple of strings containing the arguments passed to the child,
-excluding the executable. Path-like arguments were converted when added to the
-command.
-`.capture()` captures both output streams as UTF-8 text and returns `Capture`,
-adding `.stdout` and `.stderr`. `.stdout()` executes and returns stripped stdout;
-use `.capture().stdout` to preserve whitespace.
-Checked failures raise `subprocess.CalledProcessError`. Failures from
-`.capture()` retain captured output on the exception, and Harbinger prints
-captured stderr in its task-failure diagnostic. Launch errors such as
-`FileNotFoundError` and interruptions propagate normally.
+`.stdout()` returns captured stdout with leading and trailing whitespace stripped.
+Use `.capture().stdout` if you need to preserve whitespace.
 
-## Errors and execution
+## Errors and limitations
 
-Harbinger reads `tasks.py` from the current directory. It imports the file as
-Python code and runs tasks in the same process and environment. It does not
-search parent directories or set up an environment for you.
+Harbinger loads `tasks.py` from the current directory and runs tasks in the same
+process and environment. It doesn't search parent directories or create an
+environment for you.
+
+Task functions must be synchronous. Async functions, generators, and required
+parameters aren't supported. Return values are ignored.
 
 | Exit code | Meaning |
 | --- | --- |
 | `0` | Success. |
-| `1` | Task failure or error loading or defining tasks. |
-| `2` | Invalid command, missing task file, unknown task, or empty `--default` selection. |
+| `1` | A task failed, or there was an error loading or defining tasks. |
+| `2` | Invalid command, missing task file, unknown task, or no default tasks. |
 | `130` | Interrupted with Ctrl-C. |
-
-If importing `tasks.py` or running a task raises an exception, Harbinger prints
-its cause and source location. A task that raises `SystemExit` fails even if its
-exit code is zero. Listing an empty `tasks.py` succeeds.
-
-## Limitations
-
-Task functions must be regular synchronous functions. Harbinger ignores their
-return values. Async functions, generators, required parameters, and arguments
-for multiple tasks are not supported. To compose tasks, call one task function
-from another.
