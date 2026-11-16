@@ -232,7 +232,7 @@ is important for filenames with spaces.
 
 ```python
 add = Cmd("git").args("add")
-add.args("my file.py").run() # git add "my file.py"
+add.args("my file.py").run()  # git add "my file.py"
 ```
 
 ### Executables
@@ -254,7 +254,7 @@ from harbinger import Cmd
 base = Cmd("pytest").env({"CI": "1", "DEBUG": "0"})
 debug = base.env({"DEBUG": "1"}).args("-s")
 
-base.run()   # DEBUG=0
+base.run()  # DEBUG=0
 debug.run()  # DEBUG=1, with -s
 ```
 
