@@ -31,6 +31,7 @@ doing a bunch of extra work.
 - [Running commands](#running-commands)
 - [Errors and limitations](#errors-and-limitations)
 - [Development](#development)
+- [License](#license)
 
 ## Installation
 
@@ -298,3 +299,8 @@ parameters aren't supported. Return values are ignored.
 | `1` | A task failed, or there was an error loading or defining tasks. |
 | `2` | Invalid command, missing task file, unknown task, or no default tasks. |
 | `130` | Interrupted with Ctrl-C. |
+
+## License
+
+Distributed under the [Mozilla Public License 2.0](https://www.mozilla.org/en-US/MPL/2.0/).
+See [LICENSE](LICENSE) for more information.

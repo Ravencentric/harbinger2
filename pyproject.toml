@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A minimal, correct, user-friendly task runner"
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MPL-2.0"
 authors = [
   { name = "Ravencentric", email = "78981416+Ravencentric@users.noreply.github.com" }
 ]
