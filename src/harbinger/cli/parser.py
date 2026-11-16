@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from importlib.metadata import version
-from typing import Final, TypeAlias
+from typing import Final
 
 from ..annotation import IntLiteralType, ScalarType, StringLiteralType, Untyped
 from ..model import Task
@@ -35,8 +35,8 @@ class Invoke:
     argv: Sequence[str]
 
 
-Command: TypeAlias = HarbingerFlag | RunSelected | Invoke
-ArgsKwargs: TypeAlias = tuple[Sequence[object], Mapping[str, object]]
+type Command = HarbingerFlag | RunSelected | Invoke
+type ArgsKwargs = tuple[Sequence[object], Mapping[str, object]]
 
 
 @dataclass(slots=True)

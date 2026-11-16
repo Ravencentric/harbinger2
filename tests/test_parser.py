@@ -229,7 +229,7 @@ def test_command_rejects_invalid_separator_use(
 
 
 @pytest.mark.parametrize(
-    "argv", itertools.permutations(("--recursive", "a.txt", "b.txt"))
+    "argv", tuple(itertools.permutations(("--recursive", "a.txt", "b.txt")))
 )
 def test_variadic_with_keyword_flags(argv: tuple[str, ...]) -> None:
     expected = tuple(Path(arg) for arg in argv if arg != "--recursive")

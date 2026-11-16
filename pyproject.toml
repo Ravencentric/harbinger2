@@ -15,9 +15,9 @@ harbinger = "harbinger.cli:main"
 
 [dependency-groups]
 dev = [
-  "pyrefly>=1.0.0",
-  "pytest>=9.0.3",
-  "ruff>=0.15.16",
+  "pyrefly>=1.4",
+  "pytest>=9",
+  "ruff>=0.17",
 ]
 
 [build-system]
@@ -26,7 +26,10 @@ build-backend = "uv_build"
 
 [tool.pyrefly]
 preset = "strict"
-project-includes = ["*.py", "src/**/*.py"]
+project-includes = ["tasks.py", "src/**/*.py", "tests/typing/**/*.py"]
+
+[tool.ruff.lint]
+extend-ignore = ["FURB189"]
 
 [tool.uv]
 exclude-newer = "1 week"

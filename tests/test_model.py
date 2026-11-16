@@ -37,6 +37,10 @@ def test_unsupported_task_function(func: TaskFn[..., object], kind: str) -> None
     assert excinfo.value.kind == kind
 
 
+def test_task_ids_work_with_string_apis() -> None:
+    assert " ".join((TaskId("lint"), TaskId("test"))) == "lint test"
+
+
 def test_description_is_cleaned() -> None:
     @task
     def deploy() -> None:

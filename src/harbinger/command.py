@@ -4,11 +4,11 @@ import os
 import shlex
 import shutil
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from string.templatelib import Interpolation, Template, convert
-from typing import Any, Sequence, final, overload, override
+from typing import Any, final, overload, override
 
 type StrOrPath = str | os.PathLike[str]
 

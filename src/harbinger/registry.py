@@ -18,15 +18,15 @@ from .errors import (
 from .model import MARKER, NamedCallable, Task, TaskFn, TaskId, TaskSpec
 
 if TYPE_CHECKING:
-    from .model import P, R, TaskDecorator
+    from .model import TaskDecorator
 
 
 @overload
-def task(fn: NamedCallable[P, R], /) -> TaskFn[P, R]: ...
+def task[**P, R](fn: NamedCallable[P, R], /) -> TaskFn[P, R]: ...
 
 
 @overload
-def task(
+def task[**P, R](
     *,
     name: str | None = None,
     description: str | None = None,
@@ -34,7 +34,7 @@ def task(
 ) -> TaskDecorator[P, R]: ...
 
 
-def task(
+def task[**P, R](
     fn: NamedCallable[P, R] | None = None,
     /,
     *,

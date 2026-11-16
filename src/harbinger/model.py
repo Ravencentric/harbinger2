@@ -5,11 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
     Final,
-    Generic,
-    ParamSpec,
     Protocol,
-    TypeAlias,
-    TypeVar,
     final,
     override,
 )
@@ -17,20 +13,17 @@ from typing import (
 from .errors import InvalidTaskIdError, TaskError, UnsupportedTaskFunctionError
 from .signature import FixedSignature, VariadicSignature, signature
 
-P = ParamSpec("P")
-R = TypeVar("R", covariant=True)
-
 MARKER: Final = "__harbinger_taskspec__"
 
 
-class NamedCallable(Protocol, Generic[P, R]):
+class NamedCallable[**P, R](Protocol):
     @property
     def __name__(self) -> str: ...
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
-class TaskFn(NamedCallable[P, R]):
+class TaskFn[**P, R](NamedCallable[P, R]):
     @property
     @override
     def __name__(self) -> str: ...
@@ -40,7 +33,7 @@ class TaskFn(NamedCallable[P, R]):
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
-TaskDecorator: TypeAlias = Callable[[NamedCallable[P, R]], TaskFn[P, R]]
+type TaskDecorator[**P, R] = Callable[[NamedCallable[P, R]], TaskFn[P, R]]
 
 
 @final
